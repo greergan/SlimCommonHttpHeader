@@ -204,3 +204,54 @@ TEST_CASE("serialize: value containing all printable ASCII is accepted") {
     CHECK(h.serialize().starts_with("X-Foo: "));
     CHECK(h.serialize().ends_with("\r\n"));
 }
+
+TEST_CASE("operator==: identical headers are equal") {
+    slim::common::http::Header a("X-Foo", "bar");
+    slim::common::http::Header b("X-Foo", "bar");
+    CHECK(a == b);
+}
+
+TEST_CASE("operator==: name comparison is case-insensitive") {
+    slim::common::http::Header a("x-foo", "bar");
+    slim::common::http::Header b("X-FOO", "bar");
+    CHECK(a == b);
+}
+
+TEST_CASE("operator==: different names are not equal") {
+    slim::common::http::Header a("X-Foo", "bar");
+    slim::common::http::Header b("X-Baz", "bar");
+    CHECK_FALSE(a == b);
+}
+
+TEST_CASE("operator==: different values are not equal") {
+    slim::common::http::Header a("X-Foo", "bar");
+    slim::common::http::Header b("X-Foo", "baz");
+    CHECK_FALSE(a == b);
+}
+
+TEST_CASE("operator==: different value counts are not equal") {
+    slim::common::http::Header a("Accept", "text/html");
+    slim::common::http::Header b("Accept", "text/html");
+    b.set_value("application/json");
+    CHECK_FALSE(a == b);
+}
+
+TEST_CASE("operator==: multiple values in same order are equal") {
+    slim::common::http::Header a("Accept", "text/html");
+    a.set_value("application/json");
+    slim::common::http::Header b("Accept", "text/html");
+    b.set_value("application/json");
+    CHECK(a == b);
+}
+
+TEST_CASE("operator==: same delimiter are equal") {
+    slim::common::http::Header a("X-Foo", "bar", ",");
+    slim::common::http::Header b("X-Foo", "bar", ",");
+    CHECK(a == b);
+}
+
+TEST_CASE("operator==: different delimiters are not equal") {
+    slim::common::http::Header a("X-Foo", "bar", ",");
+    slim::common::http::Header b("X-Foo", "bar", ";");
+    CHECK_FALSE(a == b);
+}

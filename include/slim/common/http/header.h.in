@@ -63,7 +63,7 @@ class Header {
         Header(Header&& other) = delete;
         Header& operator=(Header&& other) = delete;
 
-        //constexpr bool operator==(const Header& other) const noexcept = default;
+        bool operator==(const Header& other) const noexcept;
 
         ~Header() = default;
 

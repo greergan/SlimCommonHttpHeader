@@ -104,6 +104,15 @@ namespace {
         return true;
     }
 
+    constexpr bool iiequals(std::string_view a, std::string_view b) noexcept {
+        if (a.size() != b.size()) return false;
+        for (size_t i = 0; i < a.size(); ++i)
+            if (ascii.to_lower[static_cast<unsigned char>(a[i])] != ascii.to_lower[static_cast<unsigned char>(b[i])])
+                return false;
+
+        return true;
+    }
+
     constexpr void trim(std::string_view& s) noexcept {
         while (!s.empty() && ascii.is_space[static_cast<unsigned char>(s.front())]) s.remove_prefix(1);
         while (!s.empty() && ascii.is_space[static_cast<unsigned char>(s.back())]) s.remove_suffix(1);
@@ -183,6 +192,16 @@ slim::common::http::Header::Header(std::string_view n, std::string_view v, std::
     else {
         delimiter = std::string(get_delimiter(name));
     }
+}
+
+bool slim::common::http::Header::operator==(const Header& other) const noexcept {
+    if (values.size() != other.values.size()) return false;
+    if(delimiter != other.delimiter) return false;
+    if (!iiequals(name, other.name)) return false;
+    for (size_t i = 0; i < values.size(); ++i)
+        if (values[i] != other.values[i]) return false;
+
+    return true;
 }
 
 HEADER::STATUS slim::common::http::Header::set_delimiter(std::string s) noexcept {
