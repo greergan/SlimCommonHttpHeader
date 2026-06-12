@@ -23,7 +23,7 @@ This library provides a strict, validation-heavy HTTP header builder and seriali
 | Name validation | RFC 9110 tchar-only enforcement |
 | Value validation | Printable ASCII (0x20–0x7E) + HTAB (0x09) |
 | Multi-value support | Append multiple values, joined on serialize |
-| Delimiter selection | Automatic per-header delimiter from known table |
+| Delimiter selection | Automatic per-header delimiter from known table (defaults to space) |
 | Custom delimiters | Override with `;` `,` or space |
 | Serialize | Preallocated, zero-fragment string build |
 | Serialize | Header validation with thrown exceptions |

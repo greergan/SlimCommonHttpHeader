@@ -255,3 +255,52 @@ TEST_CASE("operator==: different delimiters are not equal") {
     slim::common::http::Header b("X-Foo", "bar", ";");
     CHECK_FALSE(a == b);
 }
+
+TEST_CASE("Content-Type: value with charset parameter") {
+    slim::common::http::Header h("Content-Type", "text/html");
+    h.set_value("charset=utf-8");
+    CHECK(h.serialize() == "Content-Type: text/html; charset=utf-8\r\n");
+}
+
+TEST_CASE("Content-Type: multipart with boundary parameter") {
+    slim::common::http::Header h("Content-Type", "multipart/form-data");
+    h.set_value("boundary=----WebKitFormBoundary");
+    CHECK(h.serialize() == "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary\r\n");
+}
+
+TEST_CASE("Content-Type: application/json with charset") {
+    slim::common::http::Header h("Content-Type", "application/json");
+    h.set_value("charset=utf-8");
+    CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
+}
+
+TEST_CASE("Content-Disposition: attachment with filename") {
+    slim::common::http::Header h("Content-Disposition", "attachment");
+    h.set_value("filename=report.pdf");
+    CHECK(h.serialize() == "Content-Disposition: attachment; filename=report.pdf\r\n");
+}
+
+TEST_CASE("Content-Disposition: form-data with name and filename") {
+    slim::common::http::Header h("Content-Disposition", "form-data");
+    h.set_value("name=file");
+    h.set_value("filename=upload.png");
+    CHECK(h.serialize() == "Content-Disposition: form-data; name=file; filename=upload.png\r\n");
+}
+
+TEST_CASE("Authorization: Bearer token with space delimiter") {
+    slim::common::http::Header h("Authorization", "Bearer");
+    h.set_value("eyJhbGciOiJIUzI1NiJ9");
+    CHECK(h.serialize() == "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9\r\n");
+}
+
+TEST_CASE("User-Agent: product with comment tokens") {
+    slim::common::http::Header h("User-Agent", "Mozilla/5.0");
+    h.set_value("AppleWebKit/537.36");
+    h.set_value("Chrome/124.0");
+    CHECK(h.serialize() == "User-Agent: Mozilla/5.0 AppleWebKit/537.36 Chrome/124.0\r\n");
+}
+
+TEST_CASE("Content-Type: single value containing inline parameters") {
+    slim::common::http::Header h("Content-Type", "application/json; charset=utf-8");
+    CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
+}
