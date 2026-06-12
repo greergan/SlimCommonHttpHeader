@@ -6,12 +6,6 @@
 
 namespace {
 
-    static constexpr std::array<std::string_view, 3> allowed_delimiters = {
-        ";",
-        ",",
-        " ",
-    };
-
     enum struct HEADER_TYPE : uint8_t {
         ACCEPT,
         ACCEPT_CHARSET,
@@ -119,15 +113,10 @@ namespace {
     }
 
     HEADER::STATUS validate_delimiter(std::string_view s) noexcept {
-        trim(s);
-        if(!s.empty()) {
-            for(const auto& d : allowed_delimiters)
-                if(s == d) return HEADER::STATUS::OK;
-        }
-        else {
-            return HEADER::STATUS::OK;
-        }
-        return HEADER::STATUS::DELIMITER_INVALID;
+        if (s.empty()) return HEADER::STATUS::OK;
+        for (const auto& c : s)
+            if (c != ';' && c != ',' && c != ' ') return HEADER::STATUS::DELIMITER_INVALID;
+        return HEADER::STATUS::OK;
     }
 
     HEADER::STATUS validate_name(std::string_view& s) noexcept {
