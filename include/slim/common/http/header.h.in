@@ -1,0 +1,83 @@
+#ifndef SLIM_COMMON_HTTP_HEADER_H
+#define SLIM_COMMON_HTTP_HEADER_H
+
+#include <array>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
+#define SLIMCOMMONHTTPHEADER_VERSION  "@SLIMCOMMONHTTPHEADER_VERSION@"
+#define SLIMCOMMONHTTPHEADER_GIT_HASH "@SLIMCOMMONHTTPHEADER_GIT_HASH@"
+
+namespace HEADER {
+    enum struct STATUS : uint8_t {
+        OK = 0,
+        NAME_EMPTY,
+        NAME_INVALID_CHAR,
+        VALUE_EMPTY,
+        VALUE_INVALID_CHAR,
+        VALUE_INVALID_FOLDING,
+
+        _COUNT
+    };
+
+    namespace detail {
+        constexpr std::array<std::string_view, static_cast<std::size_t>(STATUS::_COUNT)> status_strings = {
+            "OK",                                                               // OK
+            "Header name cannot be empty",                                      // NAME_EMPTY
+            "Header name contains an invalid character",                        // NAME_INVALID_CHAR
+            "Header value cannot be empty",                                     // NAME_EMPTY
+            "Header value contains an invalid character",                       // VALUE_INVALID_CHAR
+            "Header value contains obsolete line folding (obs-fold)",           // VALUE_INVALID_FOLDING
+        };
+    }
+
+    [[nodiscard]] constexpr std::string_view status_string(STATUS status) noexcept {
+        const auto index = static_cast<std::size_t>(status);
+        if (index < detail::status_strings.size()) return detail::status_strings[index];
+        return "UNKNOWN";
+    }
+
+} // namespace HEADER
+
+namespace slim::common::http {
+
+class HeaderException : public std::logic_error {
+    public:
+        explicit HeaderException(HEADER::STATUS e) : std::logic_error("Invalid Header: " + std::string{HEADER::status_string(e)}) {}
+        explicit HeaderException(std::string msg)  : std::logic_error(msg) {}
+        virtual ~HeaderException() throw() {}
+};
+
+class Header {
+    public:
+        Header() = default;
+        Header(std::string_view name, std::string_view value);
+        Header(const Header& other) = delete;
+        Header& operator=(const Header& other) = delete;
+
+        Header(Header&& other) = delete;
+        Header& operator=(Header&& other) = delete;
+
+        //constexpr bool operator==(const Header& other) const noexcept = default;
+
+        ~Header() = default;
+
+        HEADER::STATUS set_name(std::string_view s) noexcept;
+        std::string_view get_name()            const noexcept { return name; }
+
+        HEADER::STATUS set_value(std::string_view s) noexcept;
+        HEADER::STATUS replace_value(std::string_view s) noexcept;
+        const std::vector<std::string>& get_value() const noexcept { return values; }
+
+        HEADER::STATUS validate() const noexcept;
+        std::string    serialize() const;
+
+    private:
+        std::string name;
+        std::vector<std::string> values;
+};
+
+} // namespace slim::common::http
+#endif // SLIM_COMMON_HTTP_HEADER_H
