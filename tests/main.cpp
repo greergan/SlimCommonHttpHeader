@@ -304,3 +304,23 @@ TEST_CASE("Content-Type: single value containing inline parameters") {
     slim::common::http::Header h("Content-Type", "application/json; charset=utf-8");
     CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
 }
+
+TEST_CASE("Accept: multiple types with quality factors") {
+    slim::common::http::Header h("Accept", "text/html; q=1.0");
+    h.set_value("application/json; q=0.9");
+    h.set_value("application/xml; q=0.8");
+    h.set_value("*/*; q=0.1");
+    CHECK(h.serialize() == "Accept: text/html; q=1.0, application/json; q=0.9, application/xml; q=0.8, */*; q=0.1\r\n");
+}
+
+TEST_CASE("Accept: single type with quality factor") {
+    slim::common::http::Header h("Accept", "text/html; q=1.0");
+    CHECK(h.serialize() == "Accept: text/html; q=1.0\r\n");
+}
+
+TEST_CASE("Accept: replace_value clears and sets single type with quality factor") {
+    slim::common::http::Header h("Accept", "text/html; q=1.0");
+    h.set_value("application/json; q=0.9");
+    h.replace_value("*/*; q=0.1");
+    CHECK(h.serialize() == "Accept: */*; q=0.1\r\n");
+}
