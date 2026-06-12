@@ -34,11 +34,19 @@ This library provides a strict, validation-heavy HTTP header builder and seriali
 ### Header class
 
 ```cpp
-slim::common::http::Header h("Content-Type", "text/html");
+slim::common::http::Header h;
 ```
 
-Constructor accepts an optional explicit delimiter as a third argument. If omitted, the delimiter is
-selected automatically from the known-header table. Throws `HeaderException` on any validation failure.
+### Constructors
+
+| Constructor | Description |
+|-------------|-------------|
+| `Header()` | Default constructor, produces an empty header |
+| `Header(std::string_view name, std::string_view value, std::string delimiter = "")` | Construct with name and initial value; delimiter is optional |
+
+The parameterised constructor validates name and value immediately, selecting the delimiter automatically from the known-header table if none is provided. Throws `HeaderException` on any validation failure.
+
+Copy and move construction and assignment are deleted.
 
 ### Setters
 
