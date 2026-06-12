@@ -69,6 +69,7 @@ namespace {
 
         constexpr AsciiTables() noexcept {
             for (size_t i = 0; i < 256; ++i) {
+                to_lower[i] = (i >= 'A' && i <= 'Z') ? static_cast<char>(i + 32) : static_cast<char>(i);
                 is_alnum[i] = (i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || (i >= '0' && i <= '9');
                 is_space[i] = (i == ' ' || i == '\t' || i == '\r' || i == '\n' || i == '\v' || i == '\f');
 
@@ -177,6 +178,7 @@ slim::common::http::Header::Header(std::string_view n, std::string_view v, std::
     if(!d.empty()) {
         e = validate_delimiter(d);
         if(e != HEADER::STATUS::OK) throw(HeaderException(e));
+        delimiter = d;
     }
     else {
         delimiter = std::string(get_delimiter(name));
