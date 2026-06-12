@@ -14,6 +14,7 @@
 namespace HEADER {
     enum struct STATUS : uint8_t {
         OK = 0,
+        DELIMITER_INVALID,
         NAME_EMPTY,
         NAME_INVALID_CHAR,
         VALUE_EMPTY,
@@ -26,6 +27,7 @@ namespace HEADER {
     namespace detail {
         constexpr std::array<std::string_view, static_cast<std::size_t>(STATUS::_COUNT)> status_strings = {
             "OK",                                                               // OK
+            "Header delimter is not valid",                                     // DELIMITER_INVALID
             "Header name cannot be empty",                                      // NAME_EMPTY
             "Header name contains an invalid character",                        // NAME_INVALID_CHAR
             "Header value cannot be empty",                                     // NAME_EMPTY
@@ -54,7 +56,7 @@ class HeaderException : public std::logic_error {
 class Header {
     public:
         Header() = default;
-        Header(std::string_view name, std::string_view value);
+        Header(std::string_view name, std::string_view value, std::string delimiter = "");
         Header(const Header& other) = delete;
         Header& operator=(const Header& other) = delete;
 
@@ -64,6 +66,8 @@ class Header {
         //constexpr bool operator==(const Header& other) const noexcept = default;
 
         ~Header() = default;
+
+        HEADER::STATUS set_delimiter(std::string s) noexcept;
 
         HEADER::STATUS set_name(std::string_view s) noexcept;
         std::string_view get_name()            const noexcept { return name; }
@@ -78,6 +82,7 @@ class Header {
     private:
         std::string name;
         std::vector<std::string> values;
+        std::string delimiter;
 };
 
 } // namespace slim::common::http
