@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <slim/common/http/header.h>
@@ -93,15 +94,15 @@ namespace {
     }
 } // namespace
 
-slim::common::http::Header::Header(std::string_view name, std::string_view value) {
-    auto e = set_name(name);
+slim::common::http::Header::Header(std::string_view n, std::string_view v) {
+    auto e = set_name(n);
     if(e != HEADER::STATUS::OK) throw(HeaderException(e));
-    e = set_value(value);
+    e = set_value(v);
     if(e != HEADER::STATUS::OK) throw(HeaderException(e));
 }
 
 HEADER::STATUS slim::common::http::Header::set_name(std::string_view s) noexcept {
-    e = validate_name(s);
+    auto e = validate_name(s);
     if(e == HEADER::STATUS::OK) name = std::string(s);
     return e;
 }
@@ -112,18 +113,18 @@ HEADER::STATUS slim::common::http::Header::replace_value(std::string_view s) noe
 }
 
 HEADER::STATUS slim::common::http::Header::set_value(std::string_view s) noexcept {
-    e = validate_value(s);
+    auto e = validate_value(s);
     if(e == HEADER::STATUS::OK) values.push_back(std::string(s));
     return e;
 }
 
 std::string slim::common::http::Header::serialize() const {
-    if(!name) throw(HeaderException(HEADER::STATUS::NAME_EMPTY));
+    if(name.empty()) throw(HeaderException(HEADER::STATUS::NAME_EMPTY));
     if(values.size() == 0) throw(HeaderException(HEADER::STATUS::VALUE_EMPTY));
 
     std::size_t total_size = name.size() + 2;                          // "HeaderName: "
     std::size_t values_count = 0;
-    for(const& v : values) {
+    for(const auto& v : values) {
         values_count++;
         total_size += v.size();                                        // value length
     }
@@ -137,12 +138,12 @@ std::string slim::common::http::Header::serialize() const {
     total_size += 2;                                                   // "\r\n"
 
     std::string result;
-    result.reserve(total_size.size());
+    result.reserve(total_size);
     result.append(name);
     result.append(": ");
 
     std::size_t values_appended = 0;
-    for(const& v : values) {
+    for(const auto& v : values) {
         result.append(v);
         values_appended++;
         if(values_appended < values_count) result.append(d);

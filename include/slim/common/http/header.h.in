@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #define SLIMCOMMONHTTPHEADER_VERSION  "@SLIMCOMMONHTTPHEADER_VERSION@"
 #define SLIMCOMMONHTTPHEADER_GIT_HASH "@SLIMCOMMONHTTPHEADER_GIT_HASH@"
