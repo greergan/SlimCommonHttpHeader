@@ -1,326 +1,312 @@
 #include <catch2/catch_test_macros.hpp>
 #include <slim/common/http/header.h>
 
+using slim::common::http::Header;
+using slim::common::http::HeaderException;
+using slim::common::http::HeaderStatus;
+
 // ─── Construction ─────────────────────────────────────────────────────────────
 
-TEST_CASE("Header: valid construction sets name and value") {
-    slim::common::http::Header h("Content-Type", "text/html");
-    CHECK(h.serialize() == "Content-Type: text/html\r\n");
-}
-
-TEST_CASE("Header: constructor trims leading/trailing whitespace from name and value") {
-    slim::common::http::Header h("  Content-Type  ", "  text/html  ");
-    CHECK(h.serialize() == "Content-Type: text/html\r\n");
-}
-
-TEST_CASE("Header: constructor with explicit delimiter stores it") {
-    slim::common::http::Header h("X-Custom", "a", ",");
-    h.set_value("b");
-    CHECK(h.serialize() == "X-Custom: a,b\r\n");
-}
-
-TEST_CASE("Header: constructor throws on empty name") {
-    CHECK_THROWS_AS(slim::common::http::Header("", "value"), slim::common::http::HeaderException);
-}
-
-TEST_CASE("Header: constructor throws on empty value") {
-    CHECK_THROWS_AS(slim::common::http::Header("X-Foo", ""), slim::common::http::HeaderException);
-}
-
-TEST_CASE("Header: constructor throws on invalid name character") {
-    CHECK_THROWS_AS(slim::common::http::Header("Bad Name", "value"), slim::common::http::HeaderException);
-}
-
-TEST_CASE("Header: constructor throws on invalid value character") {
-    // DEL (0x7F) is not a valid field-value char
-    CHECK_THROWS_AS(slim::common::http::Header("X-Foo", std::string(1, '\x7F')), slim::common::http::HeaderException);
-}
-
-TEST_CASE("Header: constructor throws on invalid delimiter") {
-    CHECK_THROWS_AS(slim::common::http::Header("X-Foo", "value", "??"), slim::common::http::HeaderException);
+TEST_CASE("Header: construction") {
+    SECTION("valid construction sets name and value") {
+        Header h("Content-Type", "text/html");
+        CHECK(h.serialize() == "Content-Type: text/html\r\n");
+    }
+    SECTION("trims leading/trailing whitespace from name and value") {
+        Header h("  Content-Type  ", "  text/html  ");
+        CHECK(h.serialize() == "Content-Type: text/html\r\n");
+    }
+    SECTION("explicit delimiter is stored") {
+        Header h("X-Custom", "a", ",");
+        h.set_value("b");
+        CHECK(h.serialize() == "X-Custom: a,b\r\n");
+    }
+    SECTION("throws on empty name") {
+        CHECK_THROWS_AS(Header("", "value"), HeaderException);
+    }
+    SECTION("throws on empty value") {
+        CHECK_THROWS_AS(Header("X-Foo", ""), HeaderException);
+    }
+    SECTION("throws on invalid name character") {
+        CHECK_THROWS_AS(Header("Bad Name", "value"), HeaderException);
+    }
+    SECTION("throws on invalid value character") {
+        CHECK_THROWS_AS(Header("X-Foo", std::string(1, '\x7F')), HeaderException);
+    }
+    SECTION("throws on invalid delimiter") {
+        CHECK_THROWS_AS(Header("X-Foo", "value", "??"), HeaderException);
+    }
 }
 
 // ─── set_name ─────────────────────────────────────────────────────────────────
 
-TEST_CASE("set_name: accepts valid token characters") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_name("X-Bar") == HEADER::STATUS::OK);
-    CHECK(h.serialize() == "X-Bar: bar\r\n");
-}
+TEST_CASE("Header: set_name") {
+    Header h("X-Foo", "bar");
 
-TEST_CASE("set_name: rejects empty name") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_name("") == HEADER::STATUS::NAME_EMPTY);
-}
-
-TEST_CASE("set_name: rejects name with space") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_name("Bad Name") == HEADER::STATUS::NAME_INVALID_CHAR);
-}
-
-TEST_CASE("set_name: rejects name with colon") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_name("Bad:Name") == HEADER::STATUS::NAME_INVALID_CHAR);
-}
-
-TEST_CASE("set_name: updates delimiter for known header") {
-    slim::common::http::Header h("X-Custom", "a");
-    h.set_value("b");
-    h.set_name("Content-Type");
-    h.set_value("charset=utf-8");
-    // Content-Type uses "; " delimiter
-    CHECK(h.serialize() == "Content-Type: a; b; charset=utf-8\r\n");
+    SECTION("accepts valid token characters") {
+        CHECK(h.set_name("X-Bar") == HeaderStatus::OK);
+        CHECK(h.serialize() == "X-Bar: bar\r\n");
+    }
+    SECTION("rejects empty name") {
+        CHECK(h.set_name("") == HeaderStatus::NameEmpty);
+    }
+    SECTION("rejects name with space") {
+        CHECK(h.set_name("Bad Name") == HeaderStatus::NameInvalidChar);
+    }
+    SECTION("rejects name with colon") {
+        CHECK(h.set_name("Bad:Name") == HeaderStatus::NameInvalidChar);
+    }
+    SECTION("updates delimiter for known header") {
+        Header ct("X-Custom", "a");
+        ct.set_value("b");
+        ct.set_name("Content-Type");
+        ct.set_value("charset=utf-8");
+        CHECK(ct.serialize() == "Content-Type: a; b; charset=utf-8\r\n");
+    }
 }
 
 // ─── set_value / replace_value ────────────────────────────────────────────────
 
-TEST_CASE("set_value: appends multiple values") {
-    slim::common::http::Header h("Accept", "text/html");
-    h.set_value("application/json");
-    CHECK(h.serialize() == "Accept: text/html, application/json\r\n");
-}
+TEST_CASE("Header: set_value / replace_value") {
+    Header h("X-Foo", "bar");
 
-TEST_CASE("set_value: rejects empty value") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_value("") == HEADER::STATUS::VALUE_EMPTY);
-}
-
-TEST_CASE("set_value: rejects value with control character") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_value(std::string(1, '\x01')) == HEADER::STATUS::VALUE_INVALID_CHAR);
-}
-
-TEST_CASE("set_value: accepts HTAB (0x09) in value") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.set_value(std::string("a\tb")) == HEADER::STATUS::OK);
-}
-
-TEST_CASE("replace_value: clears existing values and sets new one") {
-    slim::common::http::Header h("Accept", "text/html");
-    h.set_value("application/json");
-    h.replace_value("text/plain");
-    CHECK(h.serialize() == "Accept: text/plain\r\n");
+    SECTION("appends multiple values") {
+        Header accept("Accept", "text/html");
+        accept.set_value("application/json");
+        CHECK(accept.serialize() == "Accept: text/html, application/json\r\n");
+    }
+    SECTION("rejects empty value") {
+        CHECK(h.set_value("") == HeaderStatus::ValueEmpty);
+    }
+    SECTION("rejects value with control character") {
+        CHECK(h.set_value(std::string(1, '\x01')) == HeaderStatus::ValueInvalidChar);
+    }
+    SECTION("accepts HTAB in value") {
+        CHECK(h.set_value(std::string("a\tb")) == HeaderStatus::OK);
+    }
+    SECTION("replace_value clears existing values and sets new one") {
+        Header accept("Accept", "text/html");
+        accept.set_value("application/json");
+        accept.replace_value("text/plain");
+        CHECK(accept.serialize() == "Accept: text/plain\r\n");
+    }
 }
 
 // ─── set_delimiter ────────────────────────────────────────────────────────────
 
-TEST_CASE("set_delimiter: accepts semicolon") {
-    slim::common::http::Header h("X-Foo", "a");
+TEST_CASE("Header: set_delimiter") {
+    Header h("X-Foo", "a");
     h.set_value("b");
-    CHECK(h.set_delimiter(";") == HEADER::STATUS::OK);
-    CHECK(h.serialize() == "X-Foo: a;b\r\n");
-}
 
-TEST_CASE("set_delimiter: accepts comma") {
-    slim::common::http::Header h("X-Foo", "a");
-    h.set_value("b");
-    CHECK(h.set_delimiter(",") == HEADER::STATUS::OK);
-    CHECK(h.serialize() == "X-Foo: a,b\r\n");
-}
-
-TEST_CASE("set_delimiter: accepts space") {
-    slim::common::http::Header h("X-Foo", "a");
-    h.set_value("b");
-    CHECK(h.set_delimiter(" ") == HEADER::STATUS::OK);
-    CHECK(h.serialize() == "X-Foo: a b\r\n");
-}
-
-TEST_CASE("set_delimiter: rejects unknown delimiter") {
-    slim::common::http::Header h("X-Foo", "a");
-    CHECK(h.set_delimiter("|") == HEADER::STATUS::DELIMITER_INVALID);
-}
-
-TEST_CASE("set_delimiter: empty string is accepted (no delimiter)") {
-    slim::common::http::Header h("X-Foo", "a");
-    CHECK(h.set_delimiter("") == HEADER::STATUS::OK);
+    SECTION("accepts semicolon") {
+        CHECK(h.set_delimiter(";") == HeaderStatus::OK);
+        CHECK(h.serialize() == "X-Foo: a;b\r\n");
+    }
+    SECTION("accepts comma") {
+        CHECK(h.set_delimiter(",") == HeaderStatus::OK);
+        CHECK(h.serialize() == "X-Foo: a,b\r\n");
+    }
+    SECTION("accepts space") {
+        CHECK(h.set_delimiter(" ") == HeaderStatus::OK);
+        CHECK(h.serialize() == "X-Foo: a b\r\n");
+    }
+    SECTION("rejects unknown delimiter") {
+        CHECK(h.set_delimiter("|") == HeaderStatus::DelimiterInvalid);
+    }
+    SECTION("empty string is accepted") {
+        CHECK(h.set_delimiter("") == HeaderStatus::OK);
+    }
 }
 
 // ─── Known-header delimiters ──────────────────────────────────────────────────
 
-TEST_CASE("Header: Content-Type uses semicolon-space delimiter") {
-    slim::common::http::Header h("Content-Type", "text/html");
-    h.set_value("charset=utf-8");
-    CHECK(h.serialize() == "Content-Type: text/html; charset=utf-8\r\n");
-}
-
-TEST_CASE("Header: Accept uses comma-space delimiter") {
-    slim::common::http::Header h("Accept", "text/html");
-    h.set_value("application/json");
-    CHECK(h.serialize() == "Accept: text/html, application/json\r\n");
-}
-
-TEST_CASE("Header: Authorization uses space delimiter") {
-    slim::common::http::Header h("Authorization", "Bearer");
-    h.set_value("token123");
-    CHECK(h.serialize() == "Authorization: Bearer token123\r\n");
-}
-
-TEST_CASE("Header: User-Agent uses space delimiter") {
-    slim::common::http::Header h("User-Agent", "Mozilla/5.0");
-    h.set_value("(compatible)");
-    CHECK(h.serialize() == "User-Agent: Mozilla/5.0 (compatible)\r\n");
-}
-
-TEST_CASE("Header: Content-Disposition uses semicolon-space delimiter") {
-    slim::common::http::Header h("Content-Disposition", "attachment");
-    h.set_value("filename=report.pdf");
-    CHECK(h.serialize() == "Content-Disposition: attachment; filename=report.pdf\r\n");
-}
-
-TEST_CASE("Header: unknown header name gets no default delimiter") {
-    slim::common::http::Header h("X-Custom", "a");
-    h.set_value("b");
-    // delimiter should be empty for unknown headers
-    CHECK(h.serialize() == "X-Custom: ab\r\n");
-}
-
-// ─── Case-insensitive name matching for delimiter lookup ──────────────────────
-
-TEST_CASE("Header: delimiter lookup is case-insensitive for header name") {
-    slim::common::http::Header h("CONTENT-TYPE", "text/html");
-    h.set_value("charset=utf-8");
-    CHECK(h.serialize() == "CONTENT-TYPE: text/html; charset=utf-8\r\n");
+TEST_CASE("Header: known-header delimiter lookup") {
+    SECTION("Content-Type uses semicolon-space delimiter") {
+        Header h("Content-Type", "text/html");
+        h.set_value("charset=utf-8");
+        CHECK(h.serialize() == "Content-Type: text/html; charset=utf-8\r\n");
+    }
+    SECTION("Accept uses comma-space delimiter") {
+        Header h("Accept", "text/html");
+        h.set_value("application/json");
+        CHECK(h.serialize() == "Accept: text/html, application/json\r\n");
+    }
+    SECTION("Authorization uses space delimiter") {
+        Header h("Authorization", "Bearer");
+        h.set_value("token123");
+        CHECK(h.serialize() == "Authorization: Bearer token123\r\n");
+    }
+    SECTION("User-Agent uses space delimiter") {
+        Header h("User-Agent", "Mozilla/5.0");
+        h.set_value("(compatible)");
+        CHECK(h.serialize() == "User-Agent: Mozilla/5.0 (compatible)\r\n");
+    }
+    SECTION("Content-Disposition uses semicolon-space delimiter") {
+        Header h("Content-Disposition", "attachment");
+        h.set_value("filename=report.pdf");
+        CHECK(h.serialize() == "Content-Disposition: attachment; filename=report.pdf\r\n");
+    }
+    SECTION("unknown header gets no default delimiter") {
+        Header h("X-Custom", "a");
+        h.set_value("b");
+        CHECK(h.serialize() == "X-Custom: ab\r\n");
+    }
+    SECTION("lookup is case-insensitive") {
+        Header h("CONTENT-TYPE", "text/html");
+        h.set_value("charset=utf-8");
+        CHECK(h.serialize() == "CONTENT-TYPE: text/html; charset=utf-8\r\n");
+    }
 }
 
 // ─── serialize ────────────────────────────────────────────────────────────────
 
-TEST_CASE("serialize: single value produces correct format") {
-    slim::common::http::Header h("X-Foo", "bar");
-    CHECK(h.serialize() == "X-Foo: bar\r\n");
+TEST_CASE("Header: serialize") {
+    SECTION("single value produces correct format") {
+        Header h("X-Foo", "bar");
+        CHECK(h.serialize() == "X-Foo: bar\r\n");
+    }
+    SECTION("three values joined by correct delimiter") {
+        Header h("Cache-Control", "no-cache");
+        h.set_value("no-store");
+        h.set_value("must-revalidate");
+        CHECK(h.serialize() == "Cache-Control: no-cache, no-store, must-revalidate\r\n");
+    }
+    SECTION("value containing all printable ASCII is accepted") {
+        std::string printable;
+        for (int i = 0x20; i <= 0x7E; ++i) printable += static_cast<char>(i);
+        Header h("X-Foo", printable);
+        CHECK(h.serialize().starts_with("X-Foo: "));
+        CHECK(h.serialize().ends_with("\r\n"));
+    }
 }
 
-TEST_CASE("serialize: three values joined by correct delimiter") {
-    slim::common::http::Header h("Cache-Control", "no-cache");
-    h.set_value("no-store");
-    h.set_value("must-revalidate");
-    CHECK(h.serialize() == "Cache-Control: no-cache, no-store, must-revalidate\r\n");
+// ─── operator== ───────────────────────────────────────────────────────────────
+
+TEST_CASE("Header: operator==") {
+    SECTION("identical headers are equal") {
+        Header a("X-Foo", "bar");
+        Header b("X-Foo", "bar");
+        CHECK(a == b);
+    }
+    SECTION("name comparison is case-insensitive") {
+        Header a("x-foo", "bar");
+        Header b("X-FOO", "bar");
+        CHECK(a == b);
+    }
+    SECTION("different names are not equal") {
+        Header a("X-Foo", "bar");
+        Header b("X-Baz", "bar");
+        CHECK_FALSE(a == b);
+    }
+    SECTION("different values are not equal") {
+        Header a("X-Foo", "bar");
+        Header b("X-Foo", "baz");
+        CHECK_FALSE(a == b);
+    }
+    SECTION("different value counts are not equal") {
+        Header a("Accept", "text/html");
+        Header b("Accept", "text/html");
+        b.set_value("application/json");
+        CHECK_FALSE(a == b);
+    }
+    SECTION("multiple values in same order are equal") {
+        Header a("Accept", "text/html");
+        a.set_value("application/json");
+        Header b("Accept", "text/html");
+        b.set_value("application/json");
+        CHECK(a == b);
+    }
+    SECTION("same delimiter are equal") {
+        Header a("X-Foo", "bar", ",");
+        Header b("X-Foo", "bar", ",");
+        CHECK(a == b);
+    }
+    SECTION("different delimiters are not equal") {
+        Header a("X-Foo", "bar", ",");
+        Header b("X-Foo", "bar", ";");
+        CHECK_FALSE(a == b);
+    }
 }
 
-TEST_CASE("serialize: value containing all printable ASCII is accepted") {
-    // 0x20–0x7E should all be valid
-    std::string printable;
-    for (int i = 0x20; i <= 0x7E; ++i) printable += static_cast<char>(i);
-    slim::common::http::Header h("X-Foo", printable);
-    CHECK(h.serialize().starts_with("X-Foo: "));
-    CHECK(h.serialize().ends_with("\r\n"));
+// ─── Content-Type ─────────────────────────────────────────────────────────────
+
+TEST_CASE("Header: Content-Type") {
+    SECTION("value with charset parameter") {
+        Header h("Content-Type", "text/html");
+        h.set_value("charset=utf-8");
+        CHECK(h.serialize() == "Content-Type: text/html; charset=utf-8\r\n");
+    }
+    SECTION("multipart with boundary parameter") {
+        Header h("Content-Type", "multipart/form-data");
+        h.set_value("boundary=----WebKitFormBoundary");
+        CHECK(h.serialize() == "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary\r\n");
+    }
+    SECTION("application/json with charset") {
+        Header h("Content-Type", "application/json");
+        h.set_value("charset=utf-8");
+        CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
+    }
+    SECTION("single value containing inline parameters") {
+        Header h("Content-Type", "application/json; charset=utf-8");
+        CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
+    }
 }
 
-TEST_CASE("operator==: identical headers are equal") {
-    slim::common::http::Header a("X-Foo", "bar");
-    slim::common::http::Header b("X-Foo", "bar");
-    CHECK(a == b);
+// ─── Content-Disposition ──────────────────────────────────────────────────────
+
+TEST_CASE("Header: Content-Disposition") {
+    SECTION("attachment with filename") {
+        Header h("Content-Disposition", "attachment");
+        h.set_value("filename=report.pdf");
+        CHECK(h.serialize() == "Content-Disposition: attachment; filename=report.pdf\r\n");
+    }
+    SECTION("form-data with name and filename") {
+        Header h("Content-Disposition", "form-data");
+        h.set_value("name=file");
+        h.set_value("filename=upload.png");
+        CHECK(h.serialize() == "Content-Disposition: form-data; name=file; filename=upload.png\r\n");
+    }
 }
 
-TEST_CASE("operator==: name comparison is case-insensitive") {
-    slim::common::http::Header a("x-foo", "bar");
-    slim::common::http::Header b("X-FOO", "bar");
-    CHECK(a == b);
+// ─── Authorization ────────────────────────────────────────────────────────────
+
+TEST_CASE("Header: Authorization") {
+    SECTION("Bearer token with space delimiter") {
+        Header h("Authorization", "Bearer");
+        h.set_value("eyJhbGciOiJIUzI1NiJ9");
+        CHECK(h.serialize() == "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9\r\n");
+    }
 }
 
-TEST_CASE("operator==: different names are not equal") {
-    slim::common::http::Header a("X-Foo", "bar");
-    slim::common::http::Header b("X-Baz", "bar");
-    CHECK_FALSE(a == b);
+// ─── User-Agent ───────────────────────────────────────────────────────────────
+
+TEST_CASE("Header: User-Agent") {
+    SECTION("product with comment tokens") {
+        Header h("User-Agent", "Mozilla/5.0");
+        h.set_value("AppleWebKit/537.36");
+        h.set_value("Chrome/124.0");
+        CHECK(h.serialize() == "User-Agent: Mozilla/5.0 AppleWebKit/537.36 Chrome/124.0\r\n");
+    }
 }
 
-TEST_CASE("operator==: different values are not equal") {
-    slim::common::http::Header a("X-Foo", "bar");
-    slim::common::http::Header b("X-Foo", "baz");
-    CHECK_FALSE(a == b);
-}
+// ─── Accept ───────────────────────────────────────────────────────────────────
 
-TEST_CASE("operator==: different value counts are not equal") {
-    slim::common::http::Header a("Accept", "text/html");
-    slim::common::http::Header b("Accept", "text/html");
-    b.set_value("application/json");
-    CHECK_FALSE(a == b);
-}
-
-TEST_CASE("operator==: multiple values in same order are equal") {
-    slim::common::http::Header a("Accept", "text/html");
-    a.set_value("application/json");
-    slim::common::http::Header b("Accept", "text/html");
-    b.set_value("application/json");
-    CHECK(a == b);
-}
-
-TEST_CASE("operator==: same delimiter are equal") {
-    slim::common::http::Header a("X-Foo", "bar", ",");
-    slim::common::http::Header b("X-Foo", "bar", ",");
-    CHECK(a == b);
-}
-
-TEST_CASE("operator==: different delimiters are not equal") {
-    slim::common::http::Header a("X-Foo", "bar", ",");
-    slim::common::http::Header b("X-Foo", "bar", ";");
-    CHECK_FALSE(a == b);
-}
-
-TEST_CASE("Content-Type: value with charset parameter") {
-    slim::common::http::Header h("Content-Type", "text/html");
-    h.set_value("charset=utf-8");
-    CHECK(h.serialize() == "Content-Type: text/html; charset=utf-8\r\n");
-}
-
-TEST_CASE("Content-Type: multipart with boundary parameter") {
-    slim::common::http::Header h("Content-Type", "multipart/form-data");
-    h.set_value("boundary=----WebKitFormBoundary");
-    CHECK(h.serialize() == "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary\r\n");
-}
-
-TEST_CASE("Content-Type: application/json with charset") {
-    slim::common::http::Header h("Content-Type", "application/json");
-    h.set_value("charset=utf-8");
-    CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
-}
-
-TEST_CASE("Content-Disposition: attachment with filename") {
-    slim::common::http::Header h("Content-Disposition", "attachment");
-    h.set_value("filename=report.pdf");
-    CHECK(h.serialize() == "Content-Disposition: attachment; filename=report.pdf\r\n");
-}
-
-TEST_CASE("Content-Disposition: form-data with name and filename") {
-    slim::common::http::Header h("Content-Disposition", "form-data");
-    h.set_value("name=file");
-    h.set_value("filename=upload.png");
-    CHECK(h.serialize() == "Content-Disposition: form-data; name=file; filename=upload.png\r\n");
-}
-
-TEST_CASE("Authorization: Bearer token with space delimiter") {
-    slim::common::http::Header h("Authorization", "Bearer");
-    h.set_value("eyJhbGciOiJIUzI1NiJ9");
-    CHECK(h.serialize() == "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9\r\n");
-}
-
-TEST_CASE("User-Agent: product with comment tokens") {
-    slim::common::http::Header h("User-Agent", "Mozilla/5.0");
-    h.set_value("AppleWebKit/537.36");
-    h.set_value("Chrome/124.0");
-    CHECK(h.serialize() == "User-Agent: Mozilla/5.0 AppleWebKit/537.36 Chrome/124.0\r\n");
-}
-
-TEST_CASE("Content-Type: single value containing inline parameters") {
-    slim::common::http::Header h("Content-Type", "application/json; charset=utf-8");
-    CHECK(h.serialize() == "Content-Type: application/json; charset=utf-8\r\n");
-}
-
-TEST_CASE("Accept: multiple types with quality factors") {
-    slim::common::http::Header h("Accept", "text/html; q=1.0");
-    h.set_value("application/json; q=0.9");
-    h.set_value("application/xml; q=0.8");
-    h.set_value("*/*; q=0.1");
-    CHECK(h.serialize() == "Accept: text/html; q=1.0, application/json; q=0.9, application/xml; q=0.8, */*; q=0.1\r\n");
-}
-
-TEST_CASE("Accept: single type with quality factor") {
-    slim::common::http::Header h("Accept", "text/html; q=1.0");
-    CHECK(h.serialize() == "Accept: text/html; q=1.0\r\n");
-}
-
-TEST_CASE("Accept: replace_value clears and sets single type with quality factor") {
-    slim::common::http::Header h("Accept", "text/html; q=1.0");
-    h.set_value("application/json; q=0.9");
-    h.replace_value("*/*; q=0.1");
-    CHECK(h.serialize() == "Accept: */*; q=0.1\r\n");
+TEST_CASE("Header: Accept") {
+    SECTION("multiple types with quality factors") {
+        Header h("Accept", "text/html; q=1.0");
+        h.set_value("application/json; q=0.9");
+        h.set_value("application/xml; q=0.8");
+        h.set_value("*/*; q=0.1");
+        CHECK(h.serialize() == "Accept: text/html; q=1.0, application/json; q=0.9, application/xml; q=0.8, */*; q=0.1\r\n");
+    }
+    SECTION("single type with quality factor") {
+        Header h("Accept", "text/html; q=1.0");
+        CHECK(h.serialize() == "Accept: text/html; q=1.0\r\n");
+    }
+    SECTION("replace_value clears and sets single type") {
+        Header h("Accept", "text/html; q=1.0");
+        h.set_value("application/json; q=0.9");
+        h.replace_value("*/*; q=0.1");
+        CHECK(h.serialize() == "Accept: */*; q=0.1\r\n");
+    }
 }

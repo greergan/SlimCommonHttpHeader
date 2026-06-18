@@ -6,51 +6,6 @@
 
 namespace {
 
-    enum struct HEADER_TYPE : uint8_t {
-        ACCEPT,
-        ACCEPT_CHARSET,
-        ACCEPT_ENCODING,
-        ACCEPT_LANGUAGE,
-        ALLOW,
-        AUTHORIZATION,
-        CACHE_CONTROL,
-        CONNECTION,
-        CONTENT_DISPOSITION,
-        CONTENT_ENCODING,
-        CONTENT_TYPE,
-        FORWARDED,
-        IF_MATCH,
-        IF_NONE_MATCH,
-        LINK,
-        TRANSFER_ENCODING,
-        USER_AGENT,
-        VARY,
-        VIA,
-        END
-    };
-
-    static constexpr std::array<std::string_view, static_cast<std::size_t>(HEADER_TYPE::END)> delimiter_strings = {
-        ", ",  // ACCEPT
-        ", ",  // ACCEPT_CHARSET
-        ", ",  // ACCEPT_ENCODING
-        ", ",  // ACCEPT_LANGUAGE
-        ", ",  // ALLOW
-        " ",   // AUTHORIZATION
-        ", ",  // CACHE_CONTROL
-        ", ",  // CONNECTION
-        "; ",  // CONTENT_DISPOSITION
-        ", ",  // CONTENT_ENCODING
-        "; ",  // CONTENT_TYPE
-        ", ",  // FORWARDED
-        ", ",  // IF_MATCH
-        ", ",  // IF_NONE_MATCH
-        ", ",  // LINK
-        ", ",  // TRANSFER_ENCODING
-        " ",   // USER_AGENT
-        ", ",  // VARY
-        ", ",  // VIA
-    };
-
     struct AsciiTables {
         std::array<char, 256> to_lower{};
         std::array<bool, 256> is_alnum{};
@@ -90,6 +45,9 @@ namespace {
 
     constexpr AsciiTables ascii{};
 
+    using slim::common::http::HeaderStatus;
+    using slim::common::http::HeaderType;
+
     constexpr bool iequals(std::string_view a, std::string_view b) noexcept {
         if (a.size() != b.size()) return false;
         for (size_t i = 0; i < a.size(); ++i)
@@ -112,80 +70,83 @@ namespace {
         while (!s.empty() && ascii.is_space[static_cast<unsigned char>(s.back())]) s.remove_suffix(1);
     }
 
-    HEADER::STATUS validate_delimiter(std::string_view s) noexcept {
-        if (s.empty()) return HEADER::STATUS::OK;
+    HeaderStatus validate_delimiter(std::string_view s) noexcept {
+        if (s.empty()) return HeaderStatus::OK;
         for (const auto& c : s)
-            if (c != ';' && c != ',' && c != ' ') return HEADER::STATUS::DELIMITER_INVALID;
-        return HEADER::STATUS::OK;
+            if (c != ';' && c != ',' && c != ' ') return HeaderStatus::DelimiterInvalid;
+        return HeaderStatus::OK;
     }
 
-    HEADER::STATUS validate_name(std::string_view& s) noexcept {
+    HeaderStatus validate_name(std::string_view& s) noexcept {
         trim(s);
-        if (s.empty()) return HEADER::STATUS::NAME_EMPTY;
+        if (s.empty()) return HeaderStatus::NameEmpty;
 
         for (char c : s)
-            if (!ascii.is_token_char[static_cast<unsigned char>(c)]) return HEADER::STATUS::NAME_INVALID_CHAR;
+            if (!ascii.is_token_char[static_cast<unsigned char>(c)]) return HeaderStatus::NameInvalidChar;
 
-        return HEADER::STATUS::OK;
+        return HeaderStatus::OK;
     }
 
-    HEADER::STATUS validate_value(std::string_view& s) noexcept {
+    HeaderStatus validate_value(std::string_view& s) noexcept {
         trim(s);
-        if (s.empty()) return HEADER::STATUS::VALUE_EMPTY;
+        if (s.empty()) return HeaderStatus::ValueEmpty;
 
         for (char c : s)
-            if (!ascii.is_value_char[static_cast<unsigned char>(c)]) return HEADER::STATUS::VALUE_INVALID_CHAR;
+            if (!ascii.is_value_char[static_cast<unsigned char>(c)]) return HeaderStatus::ValueInvalidChar;
 
-        return HEADER::STATUS::OK;
+        return HeaderStatus::OK;
     }
 
-    std::string_view get_delimiter(std::string s) noexcept {
+    std::string_view get_delimiter(std::string_view s) noexcept {
+        using slim::common::http::header::type::delimiter;
         // hot path: highest frequency headers first
-        if (iequals(s, "content-type"))      return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::CONTENT_TYPE)];
-        if (iequals(s, "accept"))            return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::ACCEPT)];
-        if (iequals(s, "cache-control"))     return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::CACHE_CONTROL)];
-        if (iequals(s, "connection"))        return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::CONNECTION)];
-        if (iequals(s, "transfer-encoding")) return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::TRANSFER_ENCODING)];
-        if (iequals(s, "accept-encoding"))   return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::ACCEPT_ENCODING)];
-        if (iequals(s, "accept-language"))   return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::ACCEPT_LANGUAGE)];
-        if (iequals(s, "user-agent"))        return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::USER_AGENT)];
-        if (iequals(s, "authorization"))     return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::AUTHORIZATION)];
+        if (iequals(s, "content-type"))        return delimiter(HeaderType::ContentType);
+        if (iequals(s, "accept"))              return delimiter(HeaderType::Accept);
+        if (iequals(s, "cache-control"))       return delimiter(HeaderType::CacheControl);
+        if (iequals(s, "connection"))          return delimiter(HeaderType::Connection);
+        if (iequals(s, "transfer-encoding"))   return delimiter(HeaderType::TransferEncoding);
+        if (iequals(s, "accept-encoding"))     return delimiter(HeaderType::AcceptEncoding);
+        if (iequals(s, "accept-language"))     return delimiter(HeaderType::AcceptLanguage);
+        if (iequals(s, "user-agent"))          return delimiter(HeaderType::UserAgent);
+        if (iequals(s, "authorization"))       return delimiter(HeaderType::Authorization);
         // warm path
-        if (iequals(s, "vary"))              return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::VARY)];
-        if (iequals(s, "allow"))             return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::ALLOW)];
-        if (iequals(s, "accept-charset"))    return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::ACCEPT_CHARSET)];
-        if (iequals(s, "content-encoding"))  return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::CONTENT_ENCODING)];
-        if (iequals(s, "content-disposition")) return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::CONTENT_DISPOSITION)];
-        if (iequals(s, "link"))              return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::LINK)];
+        if (iequals(s, "vary"))                return delimiter(HeaderType::Vary);
+        if (iequals(s, "allow"))               return delimiter(HeaderType::Allow);
+        if (iequals(s, "accept-charset"))      return delimiter(HeaderType::AcceptCharset);
+        if (iequals(s, "content-encoding"))    return delimiter(HeaderType::ContentEncoding);
+        if (iequals(s, "content-disposition")) return delimiter(HeaderType::ContentDisposition);
+        if (iequals(s, "link"))                return delimiter(HeaderType::Link);
         // cold path
-        if (iequals(s, "forwarded"))         return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::FORWARDED)];
-        if (iequals(s, "if-match"))          return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::IF_MATCH)];
-        if (iequals(s, "if-none-match"))     return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::IF_NONE_MATCH)];
-        if (iequals(s, "via"))               return delimiter_strings[static_cast<std::size_t>(HEADER_TYPE::VIA)];
+        if (iequals(s, "forwarded"))           return delimiter(HeaderType::Forwarded);
+        if (iequals(s, "if-match"))            return delimiter(HeaderType::IfMatch);
+        if (iequals(s, "if-none-match"))       return delimiter(HeaderType::IfNoneMatch);
+        if (iequals(s, "via"))                 return delimiter(HeaderType::Via);
         return {};
     }
 } // namespace
 
+using slim::common::http::HeaderException;
+using slim::common::http::HeaderStatus;
+
 slim::common::http::Header::Header(std::string_view n, std::string_view v, std::string d) {
     auto e = set_name(n);
-    if(e != HEADER::STATUS::OK) throw(HeaderException(e));
+    if (e != HeaderStatus::OK) throw HeaderException(e);
 
     e = set_value(v);
-    if(e != HEADER::STATUS::OK) throw(HeaderException(e));
+    if (e != HeaderStatus::OK) throw HeaderException(e);
 
-    if(!d.empty()) {
+    if (!d.empty()) {
         e = validate_delimiter(d);
-        if(e != HEADER::STATUS::OK) throw(HeaderException(e));
+        if (e != HeaderStatus::OK) throw HeaderException(e);
         delimiter = d;
-    }
-    else {
+    } else {
         delimiter = std::string(get_delimiter(name));
     }
 }
 
 bool slim::common::http::Header::operator==(const Header& other) const noexcept {
     if (values.size() != other.values.size()) return false;
-    if(delimiter != other.delimiter) return false;
+    if (delimiter != other.delimiter) return false;
     if (!iiequals(name, other.name)) return false;
     for (size_t i = 0; i < values.size(); ++i)
         if (values[i] != other.values[i]) return false;
@@ -193,38 +154,38 @@ bool slim::common::http::Header::operator==(const Header& other) const noexcept 
     return true;
 }
 
-HEADER::STATUS slim::common::http::Header::set_delimiter(std::string s) noexcept {
+HeaderStatus slim::common::http::Header::set_delimiter(std::string s) noexcept {
     auto e = validate_delimiter(s);
-    if(e == HEADER::STATUS::OK) delimiter = s;
+    if (e == HeaderStatus::OK) delimiter = s;
     return e;
 }
 
-HEADER::STATUS slim::common::http::Header::set_name(std::string_view s) noexcept {
+HeaderStatus slim::common::http::Header::set_name(std::string_view s) noexcept {
     auto e = validate_name(s);
-    if(e == HEADER::STATUS::OK) name = std::string(s);
+    if (e == HeaderStatus::OK) name = std::string(s);
     delimiter = get_delimiter(name);
     return e;
 }
 
-HEADER::STATUS slim::common::http::Header::replace_value(std::string_view s) noexcept {
+HeaderStatus slim::common::http::Header::replace_value(std::string_view s) noexcept {
     values.clear();
     return set_value(s);
 }
 
-HEADER::STATUS slim::common::http::Header::set_value(std::string_view s) noexcept {
+HeaderStatus slim::common::http::Header::set_value(std::string_view s) noexcept {
     auto e = validate_value(s);
-    if(e == HEADER::STATUS::OK) values.push_back(std::string(s));
+    if (e == HeaderStatus::OK) values.push_back(std::string(s));
     return e;
 }
 
 std::string slim::common::http::Header::serialize() const {
-    if(name.empty()) throw(HeaderException(HEADER::STATUS::NAME_EMPTY));
-    if(values.size() == 0) throw(HeaderException(HEADER::STATUS::VALUE_EMPTY));
+    if (name.empty()) throw HeaderException(HeaderStatus::NameEmpty);
+    if (values.size() == 0) throw HeaderException(HeaderStatus::ValueEmpty);
 
-    std::size_t total_size = name.size() + 2;                            // "HeaderName: "
-    if(values.size() > 1) total_size += values.size() * delimiter.size();// delimiter
-    for(const auto& v : values) total_size += v.size();                  // value length
-    total_size += 2;                                                     // "\r\n"
+    std::size_t total_size = name.size() + 2;                             // "HeaderName: "
+    if (values.size() > 1) total_size += values.size() * delimiter.size(); // delimiter
+    for (const auto& v : values) total_size += v.size();                  // value length
+    total_size += 2;                                                      // "\r\n"
 
     std::string result;
     result.reserve(total_size);
@@ -232,10 +193,10 @@ std::string slim::common::http::Header::serialize() const {
     result.append(": ");
 
     std::size_t values_appended = 0;
-    for(const auto& v : values) {
+    for (const auto& v : values) {
         result.append(v);
         values_appended++;
-        if(values_appended < values.size()) result.append(delimiter);
+        if (values_appended < values.size()) result.append(delimiter);
     }
 
     result.append("\r\n");

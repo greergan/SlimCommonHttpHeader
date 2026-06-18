@@ -11,79 +11,136 @@
 #define SLIMCOMMONHTTPHEADER_VERSION  "@SLIMCOMMONHTTPHEADER_VERSION@"
 #define SLIMCOMMONHTTPHEADER_GIT_HASH "@SLIMCOMMONHTTPHEADER_GIT_HASH@"
 
-namespace HEADER {
-    enum struct STATUS : uint8_t {
-        OK = 0,
-        DELIMITER_INVALID,
-        NAME_EMPTY,
-        NAME_INVALID_CHAR,
-        VALUE_EMPTY,
-        VALUE_INVALID_CHAR,
-        VALUE_INVALID_FOLDING,
-
-        _COUNT
-    };
-
-    namespace detail {
-        constexpr std::array<std::string_view, static_cast<std::size_t>(STATUS::_COUNT)> status_strings = {
-            "OK",                                                               // OK
-            "Header delimter is not valid",                                     // DELIMITER_INVALID
-            "Header name cannot be empty",                                      // NAME_EMPTY
-            "Header name contains an invalid character",                        // NAME_INVALID_CHAR
-            "Header value cannot be empty",                                     // NAME_EMPTY
-            "Header value contains an invalid character",                       // VALUE_INVALID_CHAR
-            "Header value contains obsolete line folding (obs-fold)",           // VALUE_INVALID_FOLDING
-        };
-    }
-
-    [[nodiscard]] constexpr std::string_view status_string(STATUS status) noexcept {
-        const auto index = static_cast<std::size_t>(status);
-        if (index < detail::status_strings.size()) return detail::status_strings[index];
-        return "UNKNOWN";
-    }
-
-} // namespace HEADER
-
 namespace slim::common::http {
 
+enum class HeaderStatus : uint8_t {
+    OK = 0,
+    DelimiterInvalid,
+    NameEmpty,
+    NameInvalidChar,
+    ValueEmpty,
+    ValueInvalidChar,
+    ValueInvalidFolding,
+    Count
+};
+
+namespace header::status {
+    constexpr std::array<std::string_view, static_cast<std::size_t>(HeaderStatus::Count)> strings = {
+        "OK",                                                       // OK
+        "Header delimiter is not valid",                            // DelimiterInvalid
+        "Header name cannot be empty",                              // NameEmpty
+        "Header name contains an invalid character",                // NameInvalidChar
+        "Header value cannot be empty",                             // ValueEmpty
+        "Header value contains an invalid character",               // ValueInvalidChar
+        "Header value contains obsolete line folding (obs-fold)",   // ValueInvalidFolding
+    };
+
+    [[nodiscard]] constexpr std::string_view to_string(HeaderStatus status) noexcept {
+        const auto index = static_cast<std::size_t>(status);
+        if (index < strings.size()) return strings[index];
+        return "Unknown";
+    }
+} // namespace header::status
+
+enum class HeaderType : uint8_t {
+    Accept,
+    AcceptCharset,
+    AcceptEncoding,
+    AcceptLanguage,
+    Allow,
+    Authorization,
+    CacheControl,
+    Connection,
+    ContentDisposition,
+    ContentEncoding,
+    ContentType,
+    Forwarded,
+    IfMatch,
+    IfNoneMatch,
+    Link,
+    TransferEncoding,
+    UserAgent,
+    Vary,
+    Via,
+    Count
+};
+
+namespace header::type {
+    constexpr std::array<std::string_view, static_cast<std::size_t>(HeaderType::Count)> delimiters = {
+        ", ",  // Accept
+        ", ",  // AcceptCharset
+        ", ",  // AcceptEncoding
+        ", ",  // AcceptLanguage
+        ", ",  // Allow
+        " ",   // Authorization
+        ", ",  // CacheControl
+        ", ",  // Connection
+        "; ",  // ContentDisposition
+        ", ",  // ContentEncoding
+        "; ",  // ContentType
+        ", ",  // Forwarded
+        ", ",  // IfMatch
+        ", ",  // IfNoneMatch
+        ", ",  // Link
+        ", ",  // TransferEncoding
+        " ",   // UserAgent
+        ", ",  // Vary
+        ", ",  // Via
+    };
+
+    [[nodiscard]] constexpr std::string_view delimiter(HeaderType type) noexcept {
+        const auto index = static_cast<std::size_t>(type);
+        if (index < delimiters.size()) return delimiters[index];
+        return {};
+    }
+} // namespace header::type
+
 class HeaderException : public std::logic_error {
-    public:
-        explicit HeaderException(HEADER::STATUS e) : std::logic_error("Invalid Header: " + std::string{HEADER::status_string(e)}) {}
-        explicit HeaderException(std::string msg)  : std::logic_error(msg) {}
-        virtual ~HeaderException() throw() {}
+public:
+    explicit HeaderException(HeaderStatus e)
+        : std::logic_error("Invalid Header: " + std::string{header::status::to_string(e)}), status(e) {}
+
+    explicit HeaderException(std::string msg) : std::logic_error(msg) {}
+
+    HeaderStatus error() const noexcept { return status; }
+
+private:
+    HeaderStatus status = HeaderStatus::OK;
 };
 
 class Header {
-    public:
-        Header() = default;
-        Header(std::string_view name, std::string_view value, std::string delimiter = "");
-        Header(const Header& other) = delete;
-        Header& operator=(const Header& other) = delete;
+public:
+    Header() = default;
+    Header(std::string_view name, std::string_view value, std::string delimiter = "");
 
-        Header(Header&& other) = delete;
-        Header& operator=(Header&& other) = delete;
+    Header(const Header& other) = delete;
+    Header& operator=(const Header& other) = delete;
 
-        bool operator==(const Header& other) const noexcept;
+    Header(Header&& other) noexcept = default;
+    Header& operator=(Header&& other) noexcept = default;
 
-        ~Header() = default;
+    bool operator==(const Header& other) const noexcept;
 
-        HEADER::STATUS set_delimiter(std::string s) noexcept;
+    ~Header() = default;
 
-        HEADER::STATUS set_name(std::string_view s) noexcept;
-        std::string_view get_name()            const noexcept { return name; }
+    HeaderStatus set_delimiter(std::string s) noexcept;
 
-        HEADER::STATUS set_value(std::string_view s) noexcept;
-        HEADER::STATUS replace_value(std::string_view s) noexcept;
-        const std::vector<std::string>& get_value() const noexcept { return values; }
+    HeaderStatus set_name(std::string_view s) noexcept;
+    std::string_view get_name() const noexcept { return name; }
 
-        HEADER::STATUS validate() const noexcept;
-        std::string    serialize() const;
+    HeaderStatus set_value(std::string_view s) noexcept;
+    HeaderStatus replace_value(std::string_view s) noexcept;
+    const std::vector<std::string>& get_value() const noexcept { return values; }
 
-    private:
-        std::string name;
-        std::vector<std::string> values;
-        std::string delimiter = " ";
+    HeaderStatus validate() const noexcept;
+    std::string serialize() const;
+
+private:
+    std::string name;
+    std::vector<std::string> values;
+    std::string delimiter = " ";
 };
 
 } // namespace slim::common::http
+
 #endif // SLIM_COMMON_HTTP_HEADER_H
