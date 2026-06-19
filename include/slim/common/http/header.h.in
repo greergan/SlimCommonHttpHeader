@@ -16,6 +16,7 @@ namespace slim::common::http {
 enum class HeaderStatus : uint8_t {
     OK = 0,
     DelimiterInvalid,
+    InvalidCookie,
     NameEmpty,
     NameInvalidChar,
     ValueEmpty,
@@ -28,6 +29,7 @@ namespace header::status {
     constexpr std::array<std::string_view, static_cast<std::size_t>(HeaderStatus::Count)> strings = {
         "OK",                                                       // OK
         "Header delimiter is not valid",                            // DelimiterInvalid
+        "Invalid cookie"                                            // InvalidCookie
         "Header name cannot be empty",                              // NameEmpty
         "Header name contains an invalid character",                // NameInvalidChar
         "Header value cannot be empty",                             // ValueEmpty
