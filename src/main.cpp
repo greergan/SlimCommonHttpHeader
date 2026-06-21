@@ -45,7 +45,7 @@ namespace {
 
     constexpr AsciiTables ascii{};
 
-    using slim::common::http::HeaderStatus;
+    using slim::common::http::ErrorStatus;
     using slim::common::http::HeaderType;
 
     constexpr bool iequals(std::string_view a, std::string_view b) noexcept {
@@ -70,31 +70,31 @@ namespace {
         while (!s.empty() && ascii.is_space[static_cast<unsigned char>(s.back())]) s.remove_suffix(1);
     }
 
-    HeaderStatus validate_delimiter(std::string_view s) noexcept {
-        if (s.empty()) return HeaderStatus::OK;
+    ErrorStatus validate_delimiter(std::string_view s) noexcept {
+        if (s.empty()) return ErrorStatus::OK;
         for (const auto& c : s)
-            if (c != ';' && c != ',' && c != ' ') return HeaderStatus::DelimiterInvalid;
-        return HeaderStatus::OK;
+            if (c != ';' && c != ',' && c != ' ') return ErrorStatus::HeaderDelimiterInvalid;
+        return ErrorStatus::OK;
     }
 
-    HeaderStatus validate_name(std::string_view& s) noexcept {
+    ErrorStatus validate_name(std::string_view& s) noexcept {
         trim(s);
-        if (s.empty()) return HeaderStatus::NameEmpty;
+        if (s.empty()) return ErrorStatus::HeaderNameEmpty;
 
         for (char c : s)
-            if (!ascii.is_token_char[static_cast<unsigned char>(c)]) return HeaderStatus::NameInvalidChar;
+            if (!ascii.is_token_char[static_cast<unsigned char>(c)]) return ErrorStatus::HeaderNameInvalidChar;
 
-        return HeaderStatus::OK;
+        return ErrorStatus::OK;
     }
 
-    HeaderStatus validate_value(std::string_view& s) noexcept {
+    ErrorStatus validate_value(std::string_view& s) noexcept {
         trim(s);
-        if (s.empty()) return HeaderStatus::ValueEmpty;
+        if (s.empty()) return ErrorStatus::HeaderValueEmpty;
 
         for (char c : s)
-            if (!ascii.is_value_char[static_cast<unsigned char>(c)]) return HeaderStatus::ValueInvalidChar;
+            if (!ascii.is_value_char[static_cast<unsigned char>(c)]) return ErrorStatus::HeaderValueInvalidChar;
 
-        return HeaderStatus::OK;
+        return ErrorStatus::OK;
     }
 
     std::string_view get_delimiter(std::string_view s) noexcept {
@@ -125,19 +125,19 @@ namespace {
     }
 } // namespace
 
-using slim::common::http::HeaderException;
-using slim::common::http::HeaderStatus;
+using slim::common::http::ErrorStatus;
+using slim::common::http::HttpHeaderException;
 
 slim::common::http::Header::Header(std::string_view n, std::string_view v, std::string d) {
     auto e = set_name(n);
-    if (e != HeaderStatus::OK) throw HeaderException(e);
+    if (e != ErrorStatus::OK) throw HttpHeaderException(e);
 
     e = set_value(v);
-    if (e != HeaderStatus::OK) throw HeaderException(e);
+    if (e != ErrorStatus::OK) throw HttpHeaderException(e);
 
     if (!d.empty()) {
         e = validate_delimiter(d);
-        if (e != HeaderStatus::OK) throw HeaderException(e);
+        if (e != ErrorStatus::OK) throw HttpHeaderException(e);
         delimiter = d;
     } else {
         delimiter = std::string(get_delimiter(name));
@@ -154,33 +154,33 @@ bool slim::common::http::Header::operator==(const Header& other) const noexcept 
     return true;
 }
 
-HeaderStatus slim::common::http::Header::set_delimiter(std::string s) noexcept {
+ErrorStatus slim::common::http::Header::set_delimiter(std::string s) noexcept {
     auto e = validate_delimiter(s);
-    if (e == HeaderStatus::OK) delimiter = s;
+    if (e == ErrorStatus::OK) delimiter = s;
     return e;
 }
 
-HeaderStatus slim::common::http::Header::set_name(std::string_view s) noexcept {
+ErrorStatus slim::common::http::Header::set_name(std::string_view s) noexcept {
     auto e = validate_name(s);
-    if (e == HeaderStatus::OK) name = std::string(s);
+    if (e == ErrorStatus::OK) name = std::string(s);
     delimiter = get_delimiter(name);
     return e;
 }
 
-HeaderStatus slim::common::http::Header::replace_value(std::string_view s) noexcept {
+ErrorStatus slim::common::http::Header::replace_value(std::string_view s) noexcept {
     values.clear();
     return set_value(s);
 }
 
-HeaderStatus slim::common::http::Header::set_value(std::string_view s) noexcept {
+ErrorStatus slim::common::http::Header::set_value(std::string_view s) noexcept {
     auto e = validate_value(s);
-    if (e == HeaderStatus::OK) values.push_back(std::string(s));
+    if (e == ErrorStatus::OK) values.push_back(std::string(s));
     return e;
 }
 
 std::string slim::common::http::Header::serialize() const {
-    if (name.empty()) throw HeaderException(HeaderStatus::NameEmpty);
-    if (values.size() == 0) throw HeaderException(HeaderStatus::ValueEmpty);
+    if (name.empty()) throw HttpHeaderException(ErrorStatus::HeaderNameEmpty);
+    if (values.size() == 0) throw HttpHeaderException(ErrorStatus::HeaderValueEmpty);
 
     std::size_t total_size = name.size() + 2;                             // "HeaderName: "
     if (values.size() > 1) total_size += values.size() * delimiter.size(); // delimiter

@@ -1,4 +1,4 @@
-<a href="https://github.com/greergan/SlimTS">
+<a href="https://codeberg.org/greergan/SlimTS">
   <img src="https://raw.githubusercontent.com/greergan/SlimTS/master/assets/slimts_logo.png" width="75" alt="SlimTS Logo">
 </a>
 
@@ -16,9 +16,9 @@ CI/CD supplied by unified workflows provided by [SlimLibraryPackager](https://co
 - [Overview](#overview)
 - [Features](#features)
 - [Core API](#core-api)
-  - [HeaderStatus enum](#headerstatus-enum)
+  - [ErrorStatus enum](#errorstatus-enum)
+  - [HttpHeaderException](#httpheaderexception)
   - [HeaderType enum](#headertype-enum)
-  - [HeaderException](#headerexception)
   - [Header class](#header-class)
   - [Constructors and object lifetime](#constructors-and-object-lifetime)
   - [Operators](#operators)
@@ -26,7 +26,6 @@ CI/CD supplied by unified workflows provided by [SlimLibraryPackager](https://co
   - [Getters](#getters)
   - [Validation](#validation)
   - [Serialization](#serialization)
-- [Known-header delimiter table](#known-header-delimiter-table)
 - [Building](#building)
 - [Dependencies](#dependencies)
 - [Examples](#examples)
@@ -37,7 +36,7 @@ This library provides a strict, validation-heavy HTTP header builder and seriali
 - RFC 9110 compliant token and field-value validation
 - Strong validation for all header components
 - Zero dynamic allocation in validation paths (where possible)
-- Explicit status reporting via `HeaderStatus`
+- Explicit status reporting via [`ErrorStatus`](https://codeberg.org/greergan/SlimCommonHttp)
 - Strict parsing over permissive recovery
 - Explicit validation at each setter
 - Automatic delimiter selection for known headers
@@ -57,31 +56,21 @@ This library provides a strict, validation-heavy HTTP header builder and seriali
 | Custom delimiters | Override with `;` `,` or space |
 | Serialize | Preallocated, zero-fragment string build |
 | Serialize | Header validation with thrown exceptions |
-| Error model | Strong enum-based status reporting via `HeaderStatus` |
+| Error model | Strong enum-based status reporting via `ErrorStatus` (from [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp)) |
 
 [↑ Top](#table-of-contents)
 
 ## Core API
 
-### HeaderStatus enum
+### ErrorStatus enum
 
-All setters and `validate()` return a `HeaderStatus`. The full set of values is:
+Provided by [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp) `ErrorStatus`.
 
-| Value | Meaning |
-|-------|---------|
-| `OK` | Success |
-| `DelimiterInvalid` | Header delimiter is not valid |
-| `NameEmpty` | Header name cannot be empty |
-| `NameInvalidChar` | Header name contains an invalid character |
-| `ValueEmpty` | Header value cannot be empty |
-| `ValueInvalidChar` | Header value contains an invalid character |
-| `ValueInvalidFolding` | Header value contains obsolete line folding (obs-fold) |
+[↑ Top](#table-of-contents)
 
-Status values can be converted to a human-readable string via:
+### HttpHeaderException
 
-```cpp
-std::string_view msg = slim::common::http::header::status::to_string(status);
-```
+Provided by [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp) `HttpHeaderException`.
 
 [↑ Top](#table-of-contents)
 
@@ -120,20 +109,6 @@ std::string_view delim = slim::common::http::header::type::delimiter(HeaderType:
 
 [↑ Top](#table-of-contents)
 
-### HeaderException
-
-Thrown by the parameterised constructor and `serialize()` on validation failure.
-
-```cpp
-class HeaderException : public std::logic_error {
-public:
-    explicit HeaderException(HeaderStatus e);   // formats "Invalid Header: <status string>"
-    explicit HeaderException(std::string msg);  // arbitrary message
-};
-```
-
-[↑ Top](#table-of-contents)
-
 ### Header class
 
 ```cpp
@@ -147,7 +122,7 @@ slim::common::http::Header h;
 | Form | Description |
 |------|-------------|
 | `Header()` | Default constructor, produces an empty header |
-| `Header(std::string_view name, std::string_view value, std::string delimiter = "")` | Construct with name and initial value, validated immediately. Delimiter is optional; if omitted, it is selected automatically from the known-header table. Throws `HeaderException` on failure |
+| `Header(std::string_view name, std::string_view value, std::string delimiter = "")` | Construct with name and initial value, validated immediately. Delimiter is optional; if omitted, it is selected automatically from the known-header table. Throws `HttpHeaderException` on failure |
 | `Header(const Header&)` | Deleted — copies are not allowed |
 | `Header& operator=(const Header&)` | Deleted — copies are not allowed |
 | `Header(Header&&) noexcept` | Move construction is supported |
@@ -167,10 +142,10 @@ slim::common::http::Header h;
 
 | Method | Description |
 |--------|-------------|
-| `HeaderStatus set_name(std::string_view) noexcept` | Set header name (validated) |
-| `HeaderStatus set_value(std::string_view) noexcept` | Append a value (validated) |
-| `HeaderStatus replace_value(std::string_view) noexcept` | Clear all values and set a new one |
-| `HeaderStatus set_delimiter(std::string) noexcept` | Override the join delimiter |
+| `ErrorStatus set_name(std::string_view) noexcept` | Set header name (validated) |
+| `ErrorStatus set_value(std::string_view) noexcept` | Append a value (validated) |
+| `ErrorStatus replace_value(std::string_view) noexcept` | Clear all values and set a new one |
+| `ErrorStatus set_delimiter(std::string) noexcept` | Override the join delimiter |
 
 [↑ Top](#table-of-contents)
 
@@ -186,7 +161,7 @@ slim::common::http::Header h;
 ### Validation
 
 ```cpp
-HeaderStatus Header::validate() const noexcept;
+ErrorStatus Header::validate() const noexcept;
 ```
 
 Checks:
@@ -205,35 +180,7 @@ std::string Header::serialize() const;
 ```
 
 Outputs a fully formatted header line: `Name: value1<delim>value2\r\n`.  
-Throws `HeaderException` if validation fails — for example, an empty name or no values set.
-
-[↑ Top](#table-of-contents)
-
-## Known-header delimiter table
-
-| Header | Delimiter |
-|--------|-----------|
-| Accept | `, ` |
-| Accept-Charset | `, ` |
-| Accept-Encoding | `, ` |
-| Accept-Language | `, ` |
-| Allow | `, ` |
-| Authorization | ` ` |
-| Cache-Control | `, ` |
-| Connection | `, ` |
-| Content-Disposition | `; ` |
-| Content-Encoding | `, ` |
-| Content-Type | `; ` |
-| Forwarded | `, ` |
-| If-Match | `, ` |
-| If-None-Match | `, ` |
-| Link | `, ` |
-| Transfer-Encoding | `, ` |
-| User-Agent | ` ` |
-| Vary | `, ` |
-| Via | `, ` |
-
-Unknown headers receive an empty delimiter; values are concatenated directly.
+Throws `HttpHeaderException` if validation fails — for example, an empty name or no values set.
 
 [↑ Top](#table-of-contents)
 
@@ -245,11 +192,13 @@ This library is built using [SlimLibraryPackager](https://codeberg.org/greergan/
 
 ## Dependencies
 
-External package dependencies for this library are declared in the `required_packages` file at the repository root. This file is read by [SlimLibraryPackager](https://codeberg.org/greergan/SlimLibraryPackager) during the build process to resolve dependencies and install them if not present.
+External package dependencies for this library are declared in the [`required_packages`](required_packages) file at the repository root. This file is read by [SlimLibraryPackager](https://codeberg.org/greergan/SlimLibraryPackager) during the build process to resolve dependencies and install them if not present.
 
 ```
-none
+SlimCommonHttp
 ```
+
+- [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp)
 
 [↑ Top](#table-of-contents)
 
@@ -259,8 +208,8 @@ none
 // Constructor with automatic delimiter selection and status checking
 slim::common::http::Header h("Content-Type", "text/html");
 
-HeaderStatus e = h.set_value("charset=utf-8");
-if (e != HeaderStatus::OK) return e;
+ErrorStatus e = h.set_value("charset=utf-8");
+if (e != ErrorStatus::OK) return e;
 
 auto line = h.serialize();
 // -> "Content-Type: text/html; charset=utf-8\r\n"
@@ -276,7 +225,7 @@ try {
     auto line = h.serialize();
     // -> "Accept: text/html, application/json, */*\r\n"
 }
-catch (const slim::common::http::HeaderException& e) {
+catch (const slim::common::http::HttpHeaderException& e) {
     std::cerr << "Header serialization failed: " << e.what() << '\n';
 }
 catch (const std::exception& e) {

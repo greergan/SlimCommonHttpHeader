@@ -8,41 +8,12 @@
 #include <string_view>
 #include <vector>
 
+#include <slim/common/http/error_codes.h>
+
 #define SLIMCOMMONHTTPHEADER_VERSION  "@SLIMCOMMONHTTPHEADER_VERSION@"
 #define SLIMCOMMONHTTPHEADER_GIT_HASH "@SLIMCOMMONHTTPHEADER_GIT_HASH@"
 
 namespace slim::common::http {
-
-enum class HeaderStatus : uint8_t {
-    OK = 0,
-    DelimiterInvalid,
-    InvalidCookie,
-    NameEmpty,
-    NameInvalidChar,
-    ValueEmpty,
-    ValueInvalidChar,
-    ValueInvalidFolding,
-    Count
-};
-
-namespace header::status {
-    constexpr std::array<std::string_view, static_cast<std::size_t>(HeaderStatus::Count)> strings = {
-        "OK",                                                       // OK
-        "Header delimiter is not valid",                            // DelimiterInvalid
-        "Invalid cookie"                                            // InvalidCookie
-        "Header name cannot be empty",                              // NameEmpty
-        "Header name contains an invalid character",                // NameInvalidChar
-        "Header value cannot be empty",                             // ValueEmpty
-        "Header value contains an invalid character",               // ValueInvalidChar
-        "Header value contains obsolete line folding (obs-fold)",   // ValueInvalidFolding
-    };
-
-    [[nodiscard]] constexpr std::string_view to_string(HeaderStatus status) noexcept {
-        const auto index = static_cast<std::size_t>(status);
-        if (index < strings.size()) return strings[index];
-        return "Unknown";
-    }
-} // namespace header::status
 
 enum class HeaderType : uint8_t {
     Accept,
@@ -97,19 +68,6 @@ namespace header::type {
     }
 } // namespace header::type
 
-class HeaderException : public std::logic_error {
-public:
-    explicit HeaderException(HeaderStatus e)
-        : std::logic_error("Invalid Header: " + std::string{header::status::to_string(e)}), status(e) {}
-
-    explicit HeaderException(std::string msg) : std::logic_error(msg) {}
-
-    HeaderStatus error() const noexcept { return status; }
-
-private:
-    HeaderStatus status = HeaderStatus::OK;
-};
-
 class Header {
 public:
     Header() = default;
@@ -125,16 +83,16 @@ public:
 
     ~Header() = default;
 
-    HeaderStatus set_delimiter(std::string s) noexcept;
+    ErrorStatus set_delimiter(std::string s) noexcept;
 
-    HeaderStatus set_name(std::string_view s) noexcept;
+    ErrorStatus set_name(std::string_view s) noexcept;
     std::string_view get_name() const noexcept { return name; }
 
-    HeaderStatus set_value(std::string_view s) noexcept;
-    HeaderStatus replace_value(std::string_view s) noexcept;
+    ErrorStatus set_value(std::string_view s) noexcept;
+    ErrorStatus replace_value(std::string_view s) noexcept;
     const std::vector<std::string>& get_value() const noexcept { return values; }
 
-    HeaderStatus validate() const noexcept;
+    ErrorStatus validate() const noexcept;
     std::string serialize() const;
 
 private:

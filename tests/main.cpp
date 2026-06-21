@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <slim/common/http/header.h>
 
+using slim::common::http::ErrorStatus;
 using slim::common::http::Header;
-using slim::common::http::HeaderException;
-using slim::common::http::HeaderStatus;
+using slim::common::http::HttpHeaderException;
 
 // ─── Construction ─────────────────────────────────────────────────────────────
 
@@ -22,19 +22,19 @@ TEST_CASE("Header: construction") {
         CHECK(h.serialize() == "X-Custom: a,b\r\n");
     }
     SECTION("throws on empty name") {
-        CHECK_THROWS_AS(Header("", "value"), HeaderException);
+        CHECK_THROWS_AS(Header("", "value"), HttpHeaderException);
     }
     SECTION("throws on empty value") {
-        CHECK_THROWS_AS(Header("X-Foo", ""), HeaderException);
+        CHECK_THROWS_AS(Header("X-Foo", ""), HttpHeaderException);
     }
     SECTION("throws on invalid name character") {
-        CHECK_THROWS_AS(Header("Bad Name", "value"), HeaderException);
+        CHECK_THROWS_AS(Header("Bad Name", "value"), HttpHeaderException);
     }
     SECTION("throws on invalid value character") {
-        CHECK_THROWS_AS(Header("X-Foo", std::string(1, '\x7F')), HeaderException);
+        CHECK_THROWS_AS(Header("X-Foo", std::string(1, '\x7F')), HttpHeaderException);
     }
     SECTION("throws on invalid delimiter") {
-        CHECK_THROWS_AS(Header("X-Foo", "value", "??"), HeaderException);
+        CHECK_THROWS_AS(Header("X-Foo", "value", "??"), HttpHeaderException);
     }
 }
 
@@ -44,17 +44,17 @@ TEST_CASE("Header: set_name") {
     Header h("X-Foo", "bar");
 
     SECTION("accepts valid token characters") {
-        CHECK(h.set_name("X-Bar") == HeaderStatus::OK);
+        CHECK(h.set_name("X-Bar") == ErrorStatus::OK);
         CHECK(h.serialize() == "X-Bar: bar\r\n");
     }
     SECTION("rejects empty name") {
-        CHECK(h.set_name("") == HeaderStatus::NameEmpty);
+        CHECK(h.set_name("") == ErrorStatus::HeaderNameEmpty);
     }
     SECTION("rejects name with space") {
-        CHECK(h.set_name("Bad Name") == HeaderStatus::NameInvalidChar);
+        CHECK(h.set_name("Bad Name") == ErrorStatus::HeaderNameInvalidChar);
     }
     SECTION("rejects name with colon") {
-        CHECK(h.set_name("Bad:Name") == HeaderStatus::NameInvalidChar);
+        CHECK(h.set_name("Bad:Name") == ErrorStatus::HeaderNameInvalidChar);
     }
     SECTION("updates delimiter for known header") {
         Header ct("X-Custom", "a");
@@ -76,13 +76,13 @@ TEST_CASE("Header: set_value / replace_value") {
         CHECK(accept.serialize() == "Accept: text/html, application/json\r\n");
     }
     SECTION("rejects empty value") {
-        CHECK(h.set_value("") == HeaderStatus::ValueEmpty);
+        CHECK(h.set_value("") == ErrorStatus::HeaderValueEmpty);
     }
     SECTION("rejects value with control character") {
-        CHECK(h.set_value(std::string(1, '\x01')) == HeaderStatus::ValueInvalidChar);
+        CHECK(h.set_value(std::string(1, '\x01')) == ErrorStatus::HeaderValueInvalidChar);
     }
     SECTION("accepts HTAB in value") {
-        CHECK(h.set_value(std::string("a\tb")) == HeaderStatus::OK);
+        CHECK(h.set_value(std::string("a\tb")) == ErrorStatus::OK);
     }
     SECTION("replace_value clears existing values and sets new one") {
         Header accept("Accept", "text/html");
@@ -99,22 +99,22 @@ TEST_CASE("Header: set_delimiter") {
     h.set_value("b");
 
     SECTION("accepts semicolon") {
-        CHECK(h.set_delimiter(";") == HeaderStatus::OK);
+        CHECK(h.set_delimiter(";") == ErrorStatus::OK);
         CHECK(h.serialize() == "X-Foo: a;b\r\n");
     }
     SECTION("accepts comma") {
-        CHECK(h.set_delimiter(",") == HeaderStatus::OK);
+        CHECK(h.set_delimiter(",") == ErrorStatus::OK);
         CHECK(h.serialize() == "X-Foo: a,b\r\n");
     }
     SECTION("accepts space") {
-        CHECK(h.set_delimiter(" ") == HeaderStatus::OK);
+        CHECK(h.set_delimiter(" ") == ErrorStatus::OK);
         CHECK(h.serialize() == "X-Foo: a b\r\n");
     }
     SECTION("rejects unknown delimiter") {
-        CHECK(h.set_delimiter("|") == HeaderStatus::DelimiterInvalid);
+        CHECK(h.set_delimiter("|") == ErrorStatus::HeaderDelimiterInvalid);
     }
     SECTION("empty string is accepted") {
-        CHECK(h.set_delimiter("") == HeaderStatus::OK);
+        CHECK(h.set_delimiter("") == ErrorStatus::OK);
     }
 }
 
