@@ -3,36 +3,22 @@
 #include <string>
 #include <string_view>
 #include <slim/common/http/header.h>
+#include <slim/common/utilities.h>
 
 namespace {
 
     struct AsciiTables {
-        std::array<char, 256> to_lower{};
-        std::array<bool, 256> is_alnum{};
-        std::array<bool, 256> is_space{};
-        std::array<bool, 256> is_date_delimiter{};
-
-        // HTTP Header specific tables
+        // HTTP Header specific tables (RFC 9110) — not provided by SlimCommonUtilities
         std::array<bool, 256> is_token_char{};
         std::array<bool, 256> is_value_char{};
 
         constexpr AsciiTables() noexcept {
             for (size_t i = 0; i < 256; ++i) {
-                to_lower[i] = (i >= 'A' && i <= 'Z') ? static_cast<char>(i + 32) : static_cast<char>(i);
-                is_alnum[i] = (i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || (i >= '0' && i <= '9');
-                is_space[i] = (i == ' ' || i == '\t' || i == '\r' || i == '\n' || i == '\v' || i == '\f');
-
                 unsigned char uc = static_cast<unsigned char>(i);
-
-                // RFC 6265 §5.1.1: delimiter = %x09 / %x20-2F / %x3B-40 / %x5B-60 / %x7B-7E
-                is_date_delimiter[i] = (i == 0x09)
-                                || (i >= 0x20 && i <= 0x2F)
-                                || (i >= 0x3B && i <= 0x40)
-                                || (i >= 0x5B && i <= 0x60)
-                                || (i >= 0x7B && i <= 0x7E);
+                bool alnum = (uc >= 'a' && uc <= 'z') || (uc >= 'A' && uc <= 'Z') || (uc >= '0' && uc <= '9');
 
                 // RFC 9110 tchar
-                is_token_char[i] = is_alnum[i] ||
+                is_token_char[i] = alnum ||
                               uc == '!' || uc == '#' || uc == '$' || uc == '%' || uc == '&' ||
                               uc == '\''|| uc == '*' || uc == '+' || uc == '-' || uc == '.' ||
                               uc == '^' || uc == '_' || uc == '`' || uc == '|' || uc == '~';
@@ -47,28 +33,9 @@ namespace {
 
     using slim::common::http::ErrorStatus;
     using slim::common::http::HeaderType;
-
-    constexpr bool iequals(std::string_view a, std::string_view b) noexcept {
-        if (a.size() != b.size()) return false;
-        for (size_t i = 0; i < a.size(); ++i)
-            if (ascii.to_lower[static_cast<unsigned char>(a[i])] != static_cast<unsigned char>(b[i])) return false;
-
-        return true;
-    }
-
-    constexpr bool iiequals(std::string_view a, std::string_view b) noexcept {
-        if (a.size() != b.size()) return false;
-        for (size_t i = 0; i < a.size(); ++i)
-            if (ascii.to_lower[static_cast<unsigned char>(a[i])] != ascii.to_lower[static_cast<unsigned char>(b[i])])
-                return false;
-
-        return true;
-    }
-
-    constexpr void trim(std::string_view& s) noexcept {
-        while (!s.empty() && ascii.is_space[static_cast<unsigned char>(s.front())]) s.remove_prefix(1);
-        while (!s.empty() && ascii.is_space[static_cast<unsigned char>(s.back())]) s.remove_suffix(1);
-    }
+    using slim::common::utilities::iequals;
+    using slim::common::utilities::iiequals;
+    using slim::common::utilities::trim;
 
     ErrorStatus validate_delimiter(std::string_view s) noexcept {
         if (s.empty()) return ErrorStatus::OK;
@@ -147,7 +114,7 @@ slim::common::http::Header::Header(std::string_view n, std::string_view v, std::
 bool slim::common::http::Header::operator==(const Header& other) const noexcept {
     if (values.size() != other.values.size()) return false;
     if (delimiter != other.delimiter) return false;
-    if (!iiequals(name, other.name)) return false;
+    if (!slim::common::utilities::iiequals(name, other.name)) return false;
     for (size_t i = 0; i < values.size(); ++i)
         if (values[i] != other.values[i]) return false;
 

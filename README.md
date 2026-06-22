@@ -196,9 +196,11 @@ External package dependencies for this library are declared in the [`required_pa
 
 ```
 SlimCommonHttp
+SlimCommonUtilities 0.11.0
 ```
 
 - [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp)
+- [SlimCommonUtilities](https://codeberg.org/greergan/SlimCommonUtilities) (>= 0.11.0)
 
 [↑ Top](#table-of-contents)
 
