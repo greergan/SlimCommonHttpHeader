@@ -289,6 +289,19 @@ TEST_CASE("Header: User-Agent") {
     }
 }
 
+// ─── Transfer-Encoding ────────────────────────────────────────────────────────
+
+TEST_CASE("Header: Transfer-Encoding") {
+    SECTION("single chunked value") {
+        Header h("Transfer-Encoding", "chunked");
+        CHECK(h.serialize() == "Transfer-Encoding: chunked\r\n");
+    }
+    SECTION("single value with chunked as the last token") {
+        Header h("Transfer-Encoding", "gzip, chunked");
+        CHECK(h.serialize() == "Transfer-Encoding: gzip, chunked\r\n");
+    }
+}
+
 // ─── Accept ───────────────────────────────────────────────────────────────────
 
 TEST_CASE("Header: Accept") {

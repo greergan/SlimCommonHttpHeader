@@ -90,7 +90,7 @@ public:
 
     ErrorStatus set_value(std::string_view s) noexcept;
     ErrorStatus replace_value(std::string_view s) noexcept;
-    const std::vector<std::string>& get_value() const noexcept { return values; }
+    std::vector<std::string>& get_value() noexcept { return values; }
 
     ErrorStatus validate() const noexcept;
     std::string serialize() const;

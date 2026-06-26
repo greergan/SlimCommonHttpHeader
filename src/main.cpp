@@ -106,18 +106,15 @@ slim::common::http::Header::Header(std::string_view n, std::string_view v, std::
         e = validate_delimiter(d);
         if (e != ErrorStatus::OK) throw HttpHeaderException(e);
         delimiter = d;
-    } else {
-        delimiter = std::string(get_delimiter(name));
     }
+    else delimiter = std::string(get_delimiter(name));
 }
 
 bool slim::common::http::Header::operator==(const Header& other) const noexcept {
     if (values.size() != other.values.size()) return false;
     if (delimiter != other.delimiter) return false;
     if (!slim::common::utilities::iiequals(name, other.name)) return false;
-    for (size_t i = 0; i < values.size(); ++i)
-        if (values[i] != other.values[i]) return false;
-
+    for (size_t i = 0; i < values.size(); ++i) if (values[i] != other.values[i]) return false;
     return true;
 }
 
@@ -140,9 +137,34 @@ ErrorStatus slim::common::http::Header::replace_value(std::string_view s) noexce
 }
 
 ErrorStatus slim::common::http::Header::set_value(std::string_view s) noexcept {
-    auto e = validate_value(s);
-    if (e == ErrorStatus::OK) values.push_back(std::string(s));
-    return e;
+    std::string_view d = get_delimiter(name);
+    if (d.empty()) d = delimiter;
+
+    if (d.empty() || d.size() != 1) {
+        const ErrorStatus status = validate_value(s);
+        if (status == ErrorStatus::OK) values.emplace_back(s);
+        return status;
+    }
+
+    const std::size_t original_size = values.size();
+    slim::common::utilities::split(s, d.front(), values);
+
+    if (values.size() == original_size) {
+        const ErrorStatus status = validate_value(s);
+        if (status == ErrorStatus::OK) values.emplace_back(s);
+        return status;
+    }
+
+    for (std::size_t i = original_size; i < values.size(); ++i) {
+        std::string_view view = values[i];
+        const ErrorStatus status = validate_value(view);
+        if (status != ErrorStatus::OK) {
+            values.resize(original_size);
+            return status;
+        }
+    }
+
+    return ErrorStatus::OK;
 }
 
 std::string slim::common::http::Header::serialize() const {
