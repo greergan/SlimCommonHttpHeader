@@ -99,6 +99,7 @@ private:
     std::string name;
     std::vector<std::string> values;
     std::string delimiter = " ";
+    friend class Response;
 };
 
 } // namespace slim::common::http

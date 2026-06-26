@@ -2,7 +2,7 @@
   <img src="https://raw.githubusercontent.com/greergan/SlimTS/master/assets/slimts_logo.png" width="75" alt="SlimTS Logo">
 </a>
 
-# SlimCommonHTTPHeader
+# SlimCommonHttpHeader
 
 A lightweight, RFC 9110-oriented HTTP header implementation in modern C++.  
 Acts as a validating, backing store for the [SlimTS](https://codeberg.org/greergan/SlimTS) Javascript Header object.  
@@ -22,12 +22,14 @@ CI/CD supplied by unified workflows provided by [SlimLibraryPackager](https://co
   - [Header class](#header-class)
   - [Constructors and object lifetime](#constructors-and-object-lifetime)
   - [Operators](#operators)
+  - [Friend classes](#friend-classes)
   - [Setters](#setters)
   - [Getters](#getters)
   - [Validation](#validation)
   - [Serialization](#serialization)
 - [Building](#building)
 - [Dependencies](#dependencies)
+  - [required\_packages](#required_packages)
 - [Examples](#examples)
 
 ## Overview
@@ -76,7 +78,7 @@ Provided by [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp) `Http
 
 ### HeaderType enum
 
-Enumerates the set of headers with a known, automatically-selected delimiter. Used internally by the parameterised `Header` constructor when no explicit delimiter is supplied.
+Enumerates the set of headers with a known, automatically-selected delimiter. Used internally by the parameterised `Header` constructor when no explicit delimiter is supplied. Headers outside this set fall back to a space delimiter unless overridden.
 
 | Value | Delimiter |
 |-------|-----------|
@@ -100,8 +102,6 @@ Enumerates the set of headers with a known, automatically-selected delimiter. Us
 | `Vary` | `, ` |
 | `Via` | `, ` |
 
-Headers outside this set fall back to a space delimiter unless overridden.
-
 ```cpp
 std::string_view delim = slim::common::http::header::type::delimiter(HeaderType::ContentType);
 // -> "; "
@@ -112,10 +112,8 @@ std::string_view delim = slim::common::http::header::type::delimiter(HeaderType:
 ### Header class
 
 ```cpp
-slim::common::http::Header h;
+slim::common::http::Header h("Content-Type", "text/html");
 ```
-
-[↑ Top](#table-of-contents)
 
 ### Constructors and object lifetime
 
@@ -135,6 +133,14 @@ slim::common::http::Header h;
 | Operator | Description |
 |----------|-------------|
 | `bool operator==(const Header&) const noexcept` | Equality by name (case-insensitive), values, and delimiter |
+
+[↑ Top](#table-of-contents)
+
+### Friend classes
+
+```cpp
+friend class Response;
+```
 
 [↑ Top](#table-of-contents)
 
@@ -179,8 +185,7 @@ std::string Header::serialize() const;
 // -> "Content-Type: text/html; charset=utf-8\r\n"
 ```
 
-Outputs a fully formatted header line: `Name: value1<delim>value2\r\n`.  
-Throws `HttpHeaderException` if validation fails — for example, an empty name or no values set.
+Outputs a fully formatted header line: `Name: value1<delim>value2\r\n`. Throws `HttpHeaderException` if validation fails — for example, an empty name or no values set.
 
 [↑ Top](#table-of-contents)
 
@@ -192,10 +197,12 @@ This library is built using [SlimLibraryPackager](https://codeberg.org/greergan/
 
 ## Dependencies
 
+### required\_packages
+
 External package dependencies for this library are declared in the [`required_packages`](required_packages) file at the repository root. This file is read by [SlimLibraryPackager](https://codeberg.org/greergan/SlimLibraryPackager) during the build process to resolve dependencies and install them if not present.
 
 ```
-SlimCommonHttp
+SlimCommonHttp 0.2.0
 SlimCommonUtilities 0.11.0
 ```
 
