@@ -131,11 +131,6 @@ TEST_CASE("Header: known-header delimiter lookup") {
         h.set_value("application/json");
         CHECK(h.serialize() == "Accept: text/html, application/json\r\n");
     }
-    SECTION("Authorization uses space delimiter") {
-        Header h("Authorization", "Bearer");
-        h.set_value("token123");
-        CHECK(h.serialize() == "Authorization: Bearer token123\r\n");
-    }
     SECTION("User-Agent uses space delimiter") {
         Header h("User-Agent", "Mozilla/5.0");
         h.set_value("(compatible)");
@@ -271,10 +266,46 @@ TEST_CASE("Header: Content-Disposition") {
 // ─── Authorization ────────────────────────────────────────────────────────────
 
 TEST_CASE("Header: Authorization") {
-    SECTION("Bearer token with space delimiter") {
-        Header h("Authorization", "Bearer");
-        h.set_value("eyJhbGciOiJIUzI1NiJ9");
+    SECTION("Bearer token is stored as a single value") {
+        Header h("Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9");
         CHECK(h.serialize() == "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9\r\n");
+    }
+    SECTION("a second set_value call replaces rather than appends") {
+        Header h("Authorization", "Bearer first-token");
+        h.set_value("Bearer second-token");
+        CHECK(h.serialize() == "Authorization: Bearer second-token\r\n");
+    }
+    SECTION("a failing second set_value call clears the existing value") {
+        Header h("Authorization", "Bearer good-token");
+        CHECK(h.set_value("") == ErrorStatus::HeaderValueEmpty);
+        CHECK_THROWS_AS(h.serialize(), HttpHeaderException); // values is now empty
+    }
+}
+
+// ─── Proxy-Authorization ──────────────────────────────────────────────────────
+
+TEST_CASE("Header: Proxy-Authorization") {
+    SECTION("Bearer token is stored as a single value") {
+        Header h("Proxy-Authorization", "Bearer eyJhbGciOiJIUzI1NiJ9");
+        CHECK(h.serialize() == "Proxy-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9\r\n");
+    }
+    SECTION("Basic credential is stored as a single value") {
+        Header h("Proxy-Authorization", "Basic dXNlcjpwYXNz");
+        CHECK(h.serialize() == "Proxy-Authorization: Basic dXNlcjpwYXNz\r\n");
+    }
+    SECTION("a second set_value call replaces rather than appends") {
+        Header h("Proxy-Authorization", "Bearer first-token");
+        h.set_value("Bearer second-token");
+        CHECK(h.serialize() == "Proxy-Authorization: Bearer second-token\r\n");
+    }
+    SECTION("a failing second set_value call clears the existing value") {
+        Header h("Proxy-Authorization", "Bearer good-token");
+        CHECK(h.set_value("") == ErrorStatus::HeaderValueEmpty);
+        CHECK_THROWS_AS(h.serialize(), HttpHeaderException); // values is now empty
+    }
+    SECTION("lookup is case-insensitive") {
+        Header h("PROXY-AUTHORIZATION", "Bearer token");
+        CHECK(h.serialize() == "PROXY-AUTHORIZATION: Bearer token\r\n");
     }
 }
 

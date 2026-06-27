@@ -39,28 +39,21 @@ namespace {
 
     ErrorStatus validate_delimiter(std::string_view s) noexcept {
         if (s.empty()) return ErrorStatus::OK;
-        for (const auto& c : s)
-            if (c != ';' && c != ',' && c != ' ') return ErrorStatus::HeaderDelimiterInvalid;
+        for (const auto& c : s) if (c != ';' && c != ',' && c != ' ') return ErrorStatus::HeaderDelimiterInvalid;
         return ErrorStatus::OK;
     }
 
     ErrorStatus validate_name(std::string_view& s) noexcept {
         trim(s);
         if (s.empty()) return ErrorStatus::HeaderNameEmpty;
-
-        for (char c : s)
-            if (!ascii.is_token_char[static_cast<unsigned char>(c)]) return ErrorStatus::HeaderNameInvalidChar;
-
+        for (char c : s) if (!ascii.is_token_char[static_cast<unsigned char>(c)]) return ErrorStatus::HeaderNameInvalidChar;
         return ErrorStatus::OK;
     }
 
     ErrorStatus validate_value(std::string_view& s) noexcept {
         trim(s);
         if (s.empty()) return ErrorStatus::HeaderValueEmpty;
-
-        for (char c : s)
-            if (!ascii.is_value_char[static_cast<unsigned char>(c)]) return ErrorStatus::HeaderValueInvalidChar;
-
+        for (char c : s) if (!ascii.is_value_char[static_cast<unsigned char>(c)]) return ErrorStatus::HeaderValueInvalidChar;
         return ErrorStatus::OK;
     }
 
@@ -75,7 +68,6 @@ namespace {
         if (iequals(s, "accept-encoding"))     return delimiter(HeaderType::AcceptEncoding);
         if (iequals(s, "accept-language"))     return delimiter(HeaderType::AcceptLanguage);
         if (iequals(s, "user-agent"))          return delimiter(HeaderType::UserAgent);
-        if (iequals(s, "authorization"))       return delimiter(HeaderType::Authorization);
         // warm path
         if (iequals(s, "vary"))                return delimiter(HeaderType::Vary);
         if (iequals(s, "allow"))               return delimiter(HeaderType::Allow);
@@ -137,10 +129,17 @@ ErrorStatus slim::common::http::Header::replace_value(std::string_view s) noexce
 }
 
 ErrorStatus slim::common::http::Header::set_value(std::string_view s) noexcept {
+    // Authorization holds exactly one credential per RFC 7235 — a second call replaces, not appends.
+    // Cleared unconditionally, before validation, matching replace_value's existing clear-then-attempt semantics.
+    if (iequals(name, "authorization") || iequals(name, "proxy-authorization")) values.clear();
+
+    // Resolve the delimiter from the header name to be sure it's current — name-based delimiter
+    // takes priority; fall back to whatever delimiter is already set (e.g. an explicit override).
+    // Resolution is local only: `delimiter` itself is left untouched regardless of outcome.
     std::string_view d = get_delimiter(name);
     if (d.empty()) d = delimiter;
 
-    if (d.empty() || d.size() != 1) {
+    if (d.empty()) {
         const ErrorStatus status = validate_value(s);
         if (status == ErrorStatus::OK) values.emplace_back(s);
         return status;

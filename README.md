@@ -24,6 +24,10 @@ CI/CD supplied by unified workflows provided by [SlimLibraryPackager](https://co
   - [Operators](#operators)
   - [Friend classes](#friend-classes)
   - [Setters](#setters)
+  - [set\_value behaviour](#set_value-behaviour)
+    - [Delimiter resolution](#delimiter-resolution)
+    - [Authorization](#authorization)
+    - [Proxy-Authorization](#proxy-authorization)
   - [Getters](#getters)
   - [Validation](#validation)
   - [Serialization](#serialization)
@@ -87,7 +91,6 @@ Enumerates the set of headers with a known, automatically-selected delimiter. Us
 | `AcceptEncoding` | `, ` |
 | `AcceptLanguage` | `, ` |
 | `Allow` | `, ` |
-| `Authorization` | ` ` |
 | `CacheControl` | `, ` |
 | `Connection` | `, ` |
 | `ContentDisposition` | `; ` |
@@ -149,9 +152,40 @@ friend class Response;
 | Method | Description |
 |--------|-------------|
 | `ErrorStatus set_name(std::string_view) noexcept` | Set header name (validated) |
-| `ErrorStatus set_value(std::string_view) noexcept` | Append a value (validated) |
+| `ErrorStatus set_value(std::string_view) noexcept` | Append value (validated) |
 | `ErrorStatus replace_value(std::string_view) noexcept` | Clear all values and set a new one |
 | `ErrorStatus set_delimiter(std::string) noexcept` | Override the join delimiter |
+
+[↑ Top](#table-of-contents)
+
+### set_value behaviour
+
+`set_value` appends to the header's value list. The exact behaviour depends on the resolved delimiter and the header name.
+
+#### Delimiter resolution
+
+The delimiter used for splitting is resolved fresh on every call: the header name is looked up in the known-header table first; if found, that delimiter is used. If not found, the instance's stored delimiter (set at construction or via `set_delimiter`) is used as a fallback. The stored delimiter is never modified by this resolution.
+
+If a delimiter is found, the incoming value is split on its first character and each part is appended to the value list individually. If the value contains no occurrence of that character it is treated as a single entry. Either way, every part is trimmed and validated before being stored; if any part fails validation the entire call is rolled back and the value list is left unchanged.
+
+If no delimiter is resolved, the value is validated and stored as a single entry without splitting.
+
+#### Authorization
+
+`Authorization` is handled as a special case per RFC 7235: a credential is opaque and must not be tokenised. This header is not in the known-header delimiter table; the no-split behaviour is enforced explicitly rather than being a side effect of delimiter resolution. Every call to `set_value` clears any previously stored value first, so the header always holds at most one credential. A failed call (e.g. empty value) leaves the value list empty.
+
+#### Proxy-Authorization
+
+`Proxy-Authorization` follows identical semantics to `Authorization` per RFC 7235 — same credential structure, same no-split enforcement, same replace-on-write behaviour.
+
+**Summary**
+
+| Condition | Behaviour |
+|-----------|-----------|
+| Known-header delimiter found | Split on first delimiter character; append each part |
+| No delimiter found | Store as a single entry |
+| `Authorization` or `Proxy-Authorization` header | Clear existing value, store new credential as a single entry without splitting |
+| Any validation failure | Roll back; value list unchanged (except `Authorization`, which is cleared before validation) |
 
 [↑ Top](#table-of-contents)
 
@@ -202,12 +236,12 @@ This library is built using [SlimLibraryPackager](https://codeberg.org/greergan/
 External package dependencies for this library are declared in the [`required_packages`](required_packages) file at the repository root. This file is read by [SlimLibraryPackager](https://codeberg.org/greergan/SlimLibraryPackager) during the build process to resolve dependencies and install them if not present.
 
 ```
-SlimCommonHttp 0.2.0
-SlimCommonUtilities 0.11.0
+SlimCommonHttp
+SlimCommonUtilities 0.14.0
 ```
 
 - [SlimCommonHttp](https://codeberg.org/greergan/SlimCommonHttp)
-- [SlimCommonUtilities](https://codeberg.org/greergan/SlimCommonUtilities) (>= 0.11.0)
+- [SlimCommonUtilities](https://codeberg.org/greergan/SlimCommonUtilities) (>= 0.14.0)
 
 [↑ Top](#table-of-contents)
 
