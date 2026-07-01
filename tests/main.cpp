@@ -141,6 +141,11 @@ TEST_CASE("Header: known-header delimiter lookup") {
         h.set_value("filename=report.pdf");
         CHECK(h.serialize() == "Content-Disposition: attachment; filename=report.pdf\r\n");
     }
+    SECTION("X-Forwarded-For uses comma-space delimiter") {
+        Header h("X-Forwarded-For", "203.0.113.5");
+        h.set_value("70.41.3.18");
+        CHECK(h.serialize() == "X-Forwarded-For: 203.0.113.5, 70.41.3.18\r\n");
+    }
     SECTION("unknown header gets no default delimiter") {
         Header h("X-Custom", "a");
         h.set_value("b");
@@ -330,6 +335,31 @@ TEST_CASE("Header: Transfer-Encoding") {
     SECTION("single value with chunked as the last token") {
         Header h("Transfer-Encoding", "gzip, chunked");
         CHECK(h.serialize() == "Transfer-Encoding: gzip, chunked\r\n");
+    }
+}
+
+// ─── X-Forwarded-For ──────────────────────────────────────────────────────────
+
+TEST_CASE("Header: X-Forwarded-For") {
+    SECTION("single IP address") {
+        Header h("X-Forwarded-For", "203.0.113.5");
+        CHECK(h.serialize() == "X-Forwarded-For: 203.0.113.5\r\n");
+    }
+    SECTION("two IP addresses joined by comma-space") {
+        Header h("X-Forwarded-For", "203.0.113.5");
+        h.set_value("70.41.3.18");
+        CHECK(h.serialize() == "X-Forwarded-For: 203.0.113.5, 70.41.3.18\r\n");
+    }
+    SECTION("three IP addresses joined by comma-space") {
+        Header h("X-Forwarded-For", "203.0.113.5");
+        h.set_value("70.41.3.18");
+        h.set_value("10.0.0.1");
+        CHECK(h.serialize() == "X-Forwarded-For: 203.0.113.5, 70.41.3.18, 10.0.0.1\r\n");
+    }
+    SECTION("lookup is case-insensitive") {
+        Header h("x-forwarded-for", "203.0.113.5");
+        h.set_value("70.41.3.18");
+        CHECK(h.serialize() == "x-forwarded-for: 203.0.113.5, 70.41.3.18\r\n");
     }
 }
 

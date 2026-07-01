@@ -80,6 +80,7 @@ namespace {
         if (iequals(s, "if-match"))            return delimiter(HeaderType::IfMatch);
         if (iequals(s, "if-none-match"))       return delimiter(HeaderType::IfNoneMatch);
         if (iequals(s, "via"))                 return delimiter(HeaderType::Via);
+        if (iequals(s, "x-forwarded-for"))     return delimiter(HeaderType::XForwardedFor);
         return {};
     }
 } // namespace

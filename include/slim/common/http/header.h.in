@@ -29,6 +29,7 @@ enum class HeaderType : uint8_t {
     UserAgent,
     Vary,
     Via,
+    XForwardedFor,
     Count
 };
 namespace header::type {
@@ -51,6 +52,7 @@ namespace header::type {
         " ",   // UserAgent
         ", ",  // Vary
         ", ",  // Via
+        ", ",  // XForwardedFor
     };
     [[nodiscard]] constexpr std::string_view delimiter(HeaderType type) noexcept {
         const auto index = static_cast<std::size_t>(type);
@@ -62,24 +64,24 @@ class Header {
 public:
     Header() = default;
     Header(std::string_view name, std::string_view value, std::string delimiter = "");
-    Header(const Header& other) = delete;
+    Header(const Header& other)            = delete;
     Header& operator=(const Header& other) = delete;
-    Header(Header&& other) noexcept = default;
+    Header(Header&& other) noexcept        = default;
     Header& operator=(Header&& other) noexcept = default;
     bool operator==(const Header& other) const noexcept;
     ~Header() = default;
-    ErrorStatus set_delimiter(std::string s) noexcept;
-    ErrorStatus set_name(std::string_view s) noexcept;
-    std::string_view get_name() const noexcept { return name; }
-    ErrorStatus set_value(std::string_view s) noexcept;
-    ErrorStatus replace_value(std::string_view s) noexcept;
+    ErrorStatus              set_delimiter(std::string s) noexcept;
+    ErrorStatus              set_name(std::string_view s) noexcept;
+    std::string_view         get_name()  const noexcept { return name; }
+    ErrorStatus              set_value(std::string_view s) noexcept;
+    ErrorStatus              replace_value(std::string_view s) noexcept;
     std::vector<std::string>& get_value() noexcept { return values; }
-    ErrorStatus validate() const noexcept;
-    std::string serialize() const;
+    ErrorStatus              validate() const noexcept;
+    std::string              serialize() const;
 private:
-    std::string name;
+    std::string              name;
     std::vector<std::string> values;
-    std::string delimiter{};
+    std::string              delimiter{};
     friend class Response;
 };
 } // namespace slim::common::http

@@ -104,6 +104,7 @@ Enumerates the set of headers with a known, automatically-selected delimiter. Us
 | `UserAgent` | ` ` |
 | `Vary` | `, ` |
 | `Via` | `, ` |
+| `XForwardedFor` | `, ` |
 
 ```cpp
 std::string_view delim = slim::common::http::header::type::delimiter(HeaderType::ContentType);
@@ -194,7 +195,7 @@ If no delimiter is resolved, the value is validated and stored as a single entry
 | Method | Returns |
 |--------|---------|
 | `std::string_view get_name() const noexcept` | Header name |
-| `const std::vector<std::string>& get_value() const noexcept` | All values |
+| `std::vector<std::string>& get_value() const noexcept` | All values |
 
 [↑ Top](#table-of-contents)
 
