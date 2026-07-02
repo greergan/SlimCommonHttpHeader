@@ -384,3 +384,39 @@ TEST_CASE("Header: Accept") {
         CHECK(h.serialize() == "Accept: */*; q=0.1\r\n");
     }
 }
+
+// ─── OWS (Optional White Space) values ───────────────────────────────────────
+
+TEST_CASE("Header: OWS-only values (RFC 9110 §5.5)") {
+    SECTION("constructor accepts OWS-only value without throwing") {
+        Header h("X-Foo", " ");
+        CHECK(h.get_value().empty());
+    }
+    SECTION("constructor accepts multi-space OWS without throwing") {
+        Header h("X-Foo", "   ");
+        CHECK(h.get_value().empty());
+    }
+    SECTION("constructor accepts HTAB-only OWS without throwing") {
+        Header h("X-Foo", "\t");
+        CHECK(h.get_value().empty());
+    }
+    SECTION("constructor accepts mixed SP/HTAB OWS without throwing") {
+        Header h("X-Foo", " \t ");
+        CHECK(h.get_value().empty());
+    }
+    SECTION("set_value with OWS-only returns OK and appends nothing") {
+        Header h("X-Foo", "bar");
+        CHECK(h.set_value(" ") == ErrorStatus::OK);
+        CHECK(h.get_value().size() == 1); // only "bar" remains
+    }
+    SECTION("replace_value with OWS-only returns OK and clears values") {
+        Header h("X-Foo", "bar");
+        CHECK(h.replace_value(" ") == ErrorStatus::OK);
+        CHECK(h.get_value().empty());
+    }
+    SECTION("serialize throws after replace_value with OWS-only") {
+        Header h("X-Foo", "bar");
+        h.replace_value(" ");
+        CHECK_THROWS_AS(h.serialize(), HttpHeaderException);
+    }
+}

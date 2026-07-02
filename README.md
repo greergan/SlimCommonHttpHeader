@@ -29,7 +29,6 @@ CI/CD supplied by unified workflows provided by [SlimLibraryPackager](https://co
     - [Authorization](#authorization)
     - [Proxy-Authorization](#proxy-authorization)
   - [Getters](#getters)
-  - [Validation](#validation)
   - [Serialization](#serialization)
 - [Building](#building)
 - [Dependencies](#dependencies)
@@ -57,6 +56,7 @@ This library provides a strict, validation-heavy HTTP header builder and seriali
 |--------|-------------|
 | Name validation | RFC 9110 tchar-only enforcement |
 | Value validation | Printable ASCII (0x20–0x7E) + HTAB (0x09) |
+| OWS handling | Leading and trailing Optional White Space stripped per RFC 9110 §5.5 |
 | Multi-value support | Append multiple values, joined on serialize |
 | Delimiter selection | Automatic per-header delimiter from known table (defaults to space) |
 | Custom delimiters | Override with `;` `,` or space |
@@ -167,9 +167,9 @@ friend class Response;
 
 The delimiter used for splitting is resolved fresh on every call: the header name is looked up in the known-header table first; if found, that delimiter is used. If not found, the instance's stored delimiter (set at construction or via `set_delimiter`) is used as a fallback. The stored delimiter is never modified by this resolution.
 
-If a delimiter is found, the incoming value is split on its first character and each part is appended to the value list individually. If the value contains no occurrence of that character it is treated as a single entry. Either way, every part is trimmed and validated before being stored; if any part fails validation the entire call is rolled back and the value list is left unchanged.
+If a delimiter is found, the incoming value is split on its first character and each part is appended to the value list individually. If the value contains no occurrence of that character it is treated as a single entry. Either way, every part is trimmed of leading and trailing OWS (`SP` and `HTAB`) per RFC 9110 §5.5 before validation. A part that is empty after trimming is discarded silently and the call returns `OK`. If any non-empty part fails validation the entire call is rolled back and the value list is left unchanged.
 
-If no delimiter is resolved, the value is validated and stored as a single entry without splitting.
+If no delimiter is resolved, the value is trimmed, validated, and stored as a single entry without splitting. An OWS-only value is discarded silently and the call returns `OK`.
 
 #### Authorization
 
@@ -183,10 +183,11 @@ If no delimiter is resolved, the value is validated and stored as a single entry
 
 | Condition | Behaviour |
 |-----------|-----------|
-| Known-header delimiter found | Split on first delimiter character; append each part |
-| No delimiter found | Store as a single entry |
+| Known-header delimiter found | Split on first delimiter character; trim and append each non-empty part |
+| No delimiter found | Trim, validate, and store as a single entry |
+| OWS-only value (`" "`, `"\t"`, `" \t "`, etc.) | Trimmed to empty; discarded silently; value list unchanged; returns `OK` |
 | `Authorization` or `Proxy-Authorization` header | Clear existing value, store new credential as a single entry without splitting |
-| Any validation failure | Roll back; value list unchanged (except `Authorization`, which is cleared before validation) |
+| Any validation failure | Roll back; value list unchanged (except `Authorization` / `Proxy-Authorization`, which are cleared before validation) |
 
 [↑ Top](#table-of-contents)
 
@@ -195,21 +196,7 @@ If no delimiter is resolved, the value is validated and stored as a single entry
 | Method | Returns |
 |--------|---------|
 | `std::string_view get_name() const noexcept` | Header name |
-| `std::vector<std::string>& get_value() const noexcept` | All values |
-
-[↑ Top](#table-of-contents)
-
-### Validation
-
-```cpp
-ErrorStatus Header::validate() const noexcept;
-```
-
-Checks:
-- Name is non-empty and contains only valid RFC 9110 tchar characters
-- At least one value has been set
-- Values contain only printable ASCII or HTAB, with no obsolete line folding
-- Delimiter, if overridden, is valid
+| `std::vector<std::string>& get_value() noexcept` | All values |
 
 [↑ Top](#table-of-contents)
 
